@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── HELPERS ──────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && request.auth.token.email == 'abbahabdulsalam1@gmail.com';
+    }
+
+    function isOwner(userId) {
+      return isEmailVerified() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ─── VALIDATION HELPERS ───────────────────────
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'slug', 'price', 'carat', 'cut', 'clarity', 'color', 'shape', 'images'])
+        && data.keys().size() >= 9
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.slug is string && data.slug.size() > 0 && data.slug.size() <= 200
+        && data.price is number && data.price >= 0
+        && data.carat is number && data.carat > 0
+        && data.cut is string && data.cut.size() <= 50
+        && data.clarity is string && data.clarity.size() <= 50
+        && data.color is string && data.color.size() <= 10
+        && data.shape is string && data.shape.size() <= 50
+        && data.images is list && data.images.size() > 0 && data.images.size() <= 10
+        && data.images[0] is string;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'name', 'role'])
+        && data.keys().size() >= 3
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.role in ['CUSTOMER', 'ADMIN'];
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['email', 'phone', 'status', 'totalPrice', 'shippingAddress'])
+        && data.keys().size() >= 5
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 20
+        && data.status in ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
+        && data.totalPrice is number && data.totalPrice >= 0
+        && data.shippingAddress is map;
+    }
+
+    function isValidOrderItem(data) {
+      return data.keys().hasAll(['productId', 'name', 'price', 'quantity'])
+        && data.productId is string && data.productId.size() <= 128
+        && data.name is string && data.name.size() <= 200
+        && data.price is number && data.price >= 0
+        && data.quantity is int && data.quantity > 0;
+    }
+
+    function isValidOrderUpdate(data) {
+      return data.keys().hasAll(['status', 'createdAt'])
+        && data.status is string && data.status.size() <= 50
+        && data.createdAt == request.time;
+    }
+
+    // ─── COLLECTIONS ──────────────────────────────
+    
+    // Products
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow update: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
+      allow delete: if isAdmin() && isValidId(productId);
+    }
+
+    // Users
+    match /users/{userId} {
+      allow get: if (isOwner(userId) || isAdmin()) && isValidId(userId);
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && incoming().role == 'CUSTOMER';
+      allow update: if (isOwner(userId) || isAdmin()) && isValidId(userId) && isValidUser(incoming()) 
+                     && (isAdmin() || incoming().role == existing().role);
+    }
+
+    // Cart (Subcollection)
+    match /users/{userId}/cart/{itemId} {
+      allow read, write: if isOwner(userId) && isValidId(userId) && isValidId(itemId);
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      allow get: if (isAdmin() || (isEmailVerified() && existing().email == request.auth.token.email)) && isValidId(orderId);
+      allow list: if isAdmin() || (isEmailVerified() && resource.data.email == request.auth.token.email);
+      
+      allow create: if isEmailVerified() && isValidId(orderId) && isValidOrder(incoming()) 
+                    && incoming().email == request.auth.token.email
+                    && incoming().status == 'PENDING'
+                    && incoming().createdAt == request.time;
+      
+      allow update: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
+                    && (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'trackingNumber', 'courier', 'updatedAt']))
+                    && incoming().updatedAt == request.time;
+    }
+
+    // Order Items
+    match /orders/{orderId}/items/{itemId} {
+      allow read: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(itemId);
+      allow create: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(itemId) && isValidOrderItem(incoming());
+    }
+
+    // Order Updates (Timeline)
+    match /orders/{orderId}/updates/{updateId} {
+      allow read: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(updateId);
+      allow create: if isAdmin() && isValidId(orderId) && isValidId(updateId) && isValidOrderUpdate(incoming());
+    }
+  }
+}

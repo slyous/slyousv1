@@ -1,0 +1,10 @@
+{
+  "name": "Diamond Store — Luxury Boutique",
+  "description": "A cinematic luxury diamond boutique featuring an editorial design system, high-end product collections, and a complete e-commerce flow, powered by a full-stack Express + Firebase architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "E-commerce",
+    "Luxury UI/UX",
+    "Diamond Collection Management"
+  ]
+}

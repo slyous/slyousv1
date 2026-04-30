@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ─── HELPERS ──────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'abbahabdulsalam1@gmail.com';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ─── VALIDATION HELPERS ───────────────────────
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'slug', 'price', 'carat', 'cut', 'clarity', 'color', 'shape', 'images'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.slug is string && data.slug.size() > 0 && data.slug.size() <= 200
+        && data.price is number && data.price >= 0
+        && data.carat is number && data.carat > 0
+        && data.cut is string && data.clarity is string && data.color is string && data.shape is string
+        && data.images is list && data.images.size() > 0 && data.images.size() <= 10;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'name', 'role'])
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.role in ['CUSTOMER', 'ADMIN'];
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['email', 'phone', 'status', 'totalPrice', 'shippingAddress'])
+        && data.email is string && data.email.size() > 0
+        && data.phone is string && data.phone.size() >= 10
+        && data.status in ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
+        && data.totalPrice is number && data.totalPrice >= 0;
+    }
+
+    // ─── COLLECTIONS ──────────────────────────────
+    
+    // Products
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidProduct(incoming());
+      allow update: if isAdmin() && isValidProduct(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().role == 'CUSTOMER';
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) 
+                     && (isAdmin() || incoming().role == existing().role);
+    }
+
+    // Cart (Subcollection)
+    match /users/{userId}/cart/{itemId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      // Public tracking gate: requires Order ID and Email match in query
+      allow get: if isAdmin() || (isSignedIn() && existing().email == request.auth.token.email);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
+      
+      allow create: if isSignedIn() && isValidOrder(incoming()) 
+                    && incoming().email == request.auth.token.email
+                    && incoming().status == 'PENDING';
+      
+      allow update: if isAdmin() && isValidOrder(incoming())
+                    && (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'trackingNumber', 'courier', 'updatedAt']));
+    }
+
+    // Order Items
+    match /orders/{orderId}/items/{itemId} {
+      allow read: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email);
+      allow create: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email);
+    }
+
+    // Order Updates (Timeline)
+    match /orders/{orderId}/updates/{updateId} {
+      allow read: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email);
+      allow create: if isAdmin();
+    }
+  }
+}
