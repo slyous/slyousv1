@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-void: #0A0A0A;
+  --color-ivory: #F5F0E8;
+  --color-dark-gold: #B8860B;
+  --color-bright-gold: #D4AF37;
+  --color-graphite: #2C2C2C;
+  --color-crimson: #8B1A1A;
+  --color-muted: #888888;
+
+  --radius-sharp: 4px;
+  --radius-card: 10px;
+  --radius-section-card: 16px;
+  --radius-pill: 999px;
+
+  --ease-luxury: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@layer base {
+  body {
+    @apply bg-void text-ivory antialiased selection:bg-bright-gold selection:text-void;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+/* Theme Specific Classes */
+.ghost-text {
+  @apply fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif font-bold text-[16vw] text-white/5 uppercase tracking-[-0.05em] pointer-events-none select-none z-0 whitespace-nowrap;
+}
+
+.hero-card {
+  @apply w-[220px] h-[320px] bg-graphite rounded-card overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-white/10 transition-all duration-500 ease-luxury;
+}
+
+.vertical-text {
+  @apply fixed right-10 top-1/2 -translate-y-1/2 [writing-mode:vertical-rl] uppercase tracking-[0.4em] text-[10px] text-muted z-10 hidden xl:block;
+}
+
+.cta-button-themed {
+  @apply border border-bright-gold text-bright-gold px-8 py-3 text-sm uppercase tracking-[0.2em] font-medium bg-transparent transition-all hover:bg-bright-gold hover:text-void cursor-pointer flex items-center justify-center gap-3;
+}
+
+.status-label-themed {
+  @apply text-[11px] uppercase tracking-[0.2em] text-dark-gold mb-2 block font-sans font-medium;
+}
+
+.nav-pill-themed {
+  @apply border border-dark-gold rounded-pill px-4 py-1.5 flex items-center gap-2 text-[11px] uppercase tracking-[0.1em] transition-all hover:bg-dark-gold/10;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-void;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-graphite rounded-full hover:bg-dark-gold transition-colors;
+}

@@ -1,0 +1,198 @@
+import { motion, useScroll, useTransform } from 'motion/react';
+import { useRef } from 'react';
+import { ArrowRight, MessageCircle, ShieldCheck, Truck, Scale, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import ProductCard from '@/src/components/ui/ProductCard';
+import { mockDiamonds } from '@/src/data/mockData';
+import { cn } from '@/src/lib/utils';
+
+const Home = () => {
+  const heroRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"]
+  });
+
+  const waterMarkOpacity = useTransform(scrollYProgress, [0, 0.5], [0.05, 0]);
+  const waterMarkScale = useTransform(scrollYProgress, [0, 0.5], [1, 1.1]);
+
+  const heroImages = [
+    'https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1598560917505-59a3ad55934d?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1573408301185-9146fe634ad0?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=800&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?q=80&w=800&auto=format&fit=crop',
+  ];
+
+  return (
+    <div className="bg-void relative">
+      {/* Ghost Watermark */}
+      <motion.div 
+        style={{ opacity: waterMarkOpacity, scale: waterMarkScale }}
+        className="ghost-text"
+      >
+        Diamond Store
+      </motion.div>
+
+      {/* Vertical Side Text */}
+      <div className="vertical-text">
+        Follow Us — Instagram &nbsp; Pinterest &nbsp; Twitter
+      </div>
+
+      {/* Hero Section */}
+      <section ref={heroRef} className="relative h-screen flex items-center justify-center overflow-hidden">
+        {/* Tilted Cards Cluster */}
+        <div className="relative w-full max-w-7xl h-full flex items-center justify-center">
+          {heroImages.map((src, index) => {
+            const rotations = [-12, -6, 0, 6, 12];
+            const opacities = [0.4, 0.7, 1, 0.7, 0.4];
+            const scales = [0.85, 0.95, 1.1, 0.95, 0.85];
+            
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 100, rotate: rotations[index] }}
+                animate={{ 
+                  opacity: opacities[index], 
+                  y: 0, 
+                  rotate: rotations[index],
+                  scale: scales[index]
+                }}
+                transition={{ delay: index * 0.1, duration: 1, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className={cn(
+                  "hero-card absolute",
+                  index === 2 ? "z-30 border-bright-gold" : "z-10"
+                )}
+                style={{
+                  left: `${15 + (index * 15)}%`,
+                  top: index % 2 === 0 ? '55%' : '45%',
+                  transform: 'translate(-50%, -50%)'
+                }}
+              >
+                <img src={src} alt="Diamond Luxury" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-void via-transparent to-transparent opacity-40" />
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Hero Content Overlay */}
+        <div className="absolute bottom-24 left-12 md:left-24 z-40 max-w-lg">
+          <motion.span 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="status-label-themed"
+          >
+            Latest Collection
+          </motion.span>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-6xl md:text-8xl font-serif text-white mb-10 leading-none leading-tight"
+          >
+            Precision in <br /> 
+            <span className="italic">Every Facet</span>
+          </motion.h1>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Link to="/diamonds" className="cta-button-themed w-fit group">
+              Explore Diamonds
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </motion.div>
+        </div>
+
+        {/* Hero Navigation Controls */}
+        <div className="absolute bottom-12 right-12 flex gap-4 items-center z-40">
+          <span className="font-mono text-xs text-muted tracking-tighter">01 / 03</span>
+          <div className="flex gap-2">
+            <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
+              <ChevronLeft className="w-4 h-4 text-white" />
+            </button>
+            <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
+              <ChevronRight className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom Status Bar */}
+      <section className="border-t border-white/5 py-8 flex justify-between px-12 text-[10px] uppercase tracking-[3px] text-muted">
+        <div>GIA Certified Diamonds</div>
+        <div className="hidden md:block">Insured Global Delivery</div>
+        <div>Lifetime Authenticity Guaranteed</div>
+      </section>
+
+      {/* Featured Diamonds Section */}
+      <section className="py-32 px-6 lg:px-24">
+        <div className="max-w-[1920px] mx-auto">
+          <div className="flex items-end justify-between mb-20">
+            <div className="max-w-xl">
+              <span className="status-label-themed">Featured Jewelry</span>
+              <h2 className="text-4xl md:text-6xl font-serif text-white leading-tight">
+                From Classic to <br />
+                <span className="italic">Contemporary—</span>
+              </h2>
+            </div>
+            <Link to="/diamonds" className="group flex items-center gap-2 text-bright-gold font-sans text-xs uppercase tracking-[0.2em] mb-4">
+              See All Collection
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-8">
+            {mockDiamonds.slice(0, 5).map((diamond) => (
+              <ProductCard key={diamond.id} diamond={diamond} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* About Us Crimson Section */}
+      <section className="py-32 px-6 lg:px-24">
+        <div className="max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch">
+          <div className="relative aspect-square lg:aspect-auto rounded-section-card overflow-hidden">
+            <img 
+              src="https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?q=80&w=1200&auto=format&fit=crop" 
+              alt="Editorial Jewelry" 
+              className="w-full h-full object-cover grayscale brightness-75"
+            />
+          </div>
+          <div className="bg-crimson p-12 lg:p-24 rounded-section-card flex flex-col justify-center relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <ShieldCheck className="w-48 h-48 text-white rotate-12" />
+            </div>
+            <span className="status-label-themed !text-white/60">Our Heritage</span>
+            <h2 className="text-4xl md:text-6xl font-serif text-white italic mb-10 leading-tight relative z-10 transition-transform group-hover:-translate-y-1">
+              About Veloura
+            </h2>
+            <div className="space-y-6 text-white/90 font-sans text-lg relative z-10 leading-relaxed max-w-md">
+              <p>
+                At Veloura, we believe a diamond is more than a gem—it is a vessel for memory and a symbol of timeless grace. Born from a passion for the extraordinary.
+              </p>
+              <p>
+                Every piece is thoughtfully crafted with precision, combining luxurious materials and contemporary design to capture the essence of understated glamour.
+              </p>
+            </div>
+            <div className="mt-12 relative z-10">
+              <button className="cta-button-themed border-white text-white hover:bg-white hover:text-crimson">
+                Read Our Story
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WhatsApp Floating Button */}
+      <button className="fixed bottom-10 right-10 z-[100] w-14 h-14 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all outline-none">
+        <MessageCircle className="w-7 h-7" />
+      </button>
+    </div>
+  );
+};
+
+export default Home;
