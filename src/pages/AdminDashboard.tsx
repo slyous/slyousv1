@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/src/context/AuthContext';
-import { Navigate } from 'react-router-dom';
-import { TrendingUp, ShoppingBag, Package, DollarSign, Clock, CheckCircle, Truck, XCircle } from 'lucide-react';
+import { Navigate, Link } from 'react-router-dom';
+import { TrendingUp, ShoppingBag, Package, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/src/lib/utils';
 import Badge from '@/src/components/ui/Badge';
 import { OrderStatus } from '@/src/types';
+import { db } from '@/src/lib/firebase';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
 
 interface Stats {
   orderCount: number;
@@ -16,10 +19,11 @@ interface Stats {
 const AdminDashboard = () => {
   const { user, isAdmin, loading } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchStatsAndOrders = async () => {
       if (!user) return;
       try {
         const idToken = await user.getIdToken();
@@ -30,15 +34,21 @@ const AdminDashboard = () => {
         });
         const data = await res.json();
         setStats(data);
+        
+        // Fetch recent orders
+        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(10));
+        const snapshot = await getDocs(q);
+        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setOrders(fetchedOrders);
       } catch (error) {
-        console.error('Error fetching admin stats:', error);
+        console.error('Error fetching admin stats/orders:', error);
       } finally {
         setFetching(false);
       }
     };
 
     if (isAdmin) {
-      fetchStats();
+      fetchStatsAndOrders();
     }
   }, [isAdmin, user]);
 
@@ -55,9 +65,18 @@ const AdminDashboard = () => {
   return (
     <div className="bg-void min-h-screen pt-32 pb-32">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="mb-12">
-          <span className="status-label-themed">Admin Control</span>
-          <h1 className="text-4xl font-serif text-white italic">Executive Overview</h1>
+        <div className="flex justify-between items-end mb-12">
+          <div>
+            <span className="status-label-themed">Admin Control</span>
+            <h1 className="text-4xl font-serif text-white italic">Executive Overview</h1>
+          </div>
+          <Link
+            to="/admin/products"
+            className="flex items-center gap-2 bg-white/5 border border-white/10 text-ivory px-6 py-3 rounded-lg font-medium hover:bg-white/10 transition-colors"
+          >
+            <Package className="w-5 h-5" />
+            Manage Products
+          </Link>
         </div>
 
         {/* Stats Grid */}
@@ -93,23 +112,34 @@ const AdminDashboard = () => {
                   <th className="p-8">Order ID</th>
                   <th className="p-8">Customer</th>
                   <th className="p-8">Status</th>
+                  <th className="p-8">Date</th>
                   <th className="p-8">Total</th>
                   <th className="p-8">Action</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
-                <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="p-8 font-mono text-ivory">#VEL-92831</td>
-                  <td className="p-8 text-ivory">Jonathan Edwards</td>
-                  <td className="p-8">
-                    <Badge status={OrderStatus.PENDING}>Pending</Badge>
-                  </td>
-                  <td className="p-8 text-bright-gold">{formatCurrency(45000)}</td>
-                  <td className="p-8">
-                    <button className="text-xs uppercase tracking-widest text-muted hover:text-white">Manage</button>
-                  </td>
-                </tr>
-                {/* Mock data for now as the server routes are just skeletons */}
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-ivory/60">No recent orders found.</td>
+                  </tr>
+                ) : (
+                  orders.map(order => (
+                    <tr key={order.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="p-8 font-mono text-ivory">#{order.id.slice(-8).toUpperCase()}</td>
+                      <td className="p-8 text-ivory">{order.email}</td>
+                      <td className="p-8">
+                        <Badge status={order.status as OrderStatus}>{order.status}</Badge>
+                      </td>
+                      <td className="p-8 text-ivory/60">
+                        {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="p-8 text-bright-gold">{formatCurrency(order.totalPrice || 0)}</td>
+                      <td className="p-8">
+                        <Link to={`/admin/orders/${order.id}`} className="text-xs uppercase tracking-widest text-muted hover:text-white">Manage</Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

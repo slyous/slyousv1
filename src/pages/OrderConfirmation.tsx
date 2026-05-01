@@ -1,9 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Check, Package, MapPin, Truck, ArrowRight } from 'lucide-react';
 import Button from '@/src/components/ui/Button';
 
 const OrderConfirmation = () => {
+  const location = useLocation();
+  const orderId = location.state?.orderId;
+  const orderNumber = location.state?.orderNumber || orderId?.substring(0, 8).toUpperCase() || 'VLR-2026-9932';
+
   return (
     <div className="bg-void min-h-screen pt-48 pb-32 px-6 flex flex-col items-center justify-center text-center">
       <div className="max-w-xl mx-auto">
@@ -38,7 +42,7 @@ const OrderConfirmation = () => {
           className="mb-12 inline-block px-8 py-3 bg-graphite/20 border border-white/5 rounded-card"
         >
           <span className="text-[10px] font-mono text-muted-text uppercase tracking-widest mr-4">Order ID</span>
-          <span className="text-white font-mono tracking-widest">#VLR-2026-9932</span>
+          <span className="text-white font-mono tracking-widest">#{orderNumber}</span>
         </motion.div>
 
         {/* Timeline */}
@@ -61,12 +65,14 @@ const OrderConfirmation = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-6 justify-center">
-          <Button size="lg" className="px-12">
-            Track Your Order
-            <MapPin className="w-4 h-4 ml-2" />
-          </Button>
+          <Link to={`/track-order/${orderId || orderNumber}`}>
+            <Button size="lg" className="px-12 w-full sm:w-auto">
+              Track Your Order
+              <MapPin className="w-4 h-4 ml-2" />
+            </Button>
+          </Link>
           <Link to="/">
-            <Button variant="ghost" size="lg" className="text-ivory hover:text-white group">
+            <Button variant="ghost" size="lg" className="text-ivory hover:text-white group w-full sm:w-auto">
               Continue Browsing
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>

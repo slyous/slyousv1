@@ -10,8 +10,23 @@ import Wishlist from './pages/Wishlist';
 import Checkout from './pages/Checkout';
 import OrderConfirmation from './pages/OrderConfirmation';
 import AdminDashboard from './pages/AdminDashboard';
+import TrackOrder from './pages/TrackOrder';
+import Login from './pages/Login';
+import Account from './pages/Account';
+import AdminProducts from './pages/AdminProducts';
+import AdminProductEdit from './pages/AdminProductEdit';
+import Authenticity from './pages/Authenticity';
+import Shipping from './pages/Shipping';
+import Returns from './pages/Returns';
+import AboutUs from './pages/AboutUs';
+import Boutiques from './pages/Boutiques';
+import Consultation from './pages/Consultation';
+import Careers from './pages/Careers';
+import Contact from './pages/Contact';
 import { WishlistProvider } from './context/WishlistContext';
 import { AuthProvider } from './context/AuthContext';
+import { CartProvider } from './context/CartContext';
+import { ToastProvider } from './context/ToastContext';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -25,8 +40,10 @@ function ScrollToTop() {
 export default function App() {
   return (
     <AuthProvider>
-      <WishlistProvider>
-        <Router>
+      <CartProvider>
+        <ToastProvider>
+          <WishlistProvider>
+            <Router>
           <ScrollToTop />
           <div className="flex flex-col min-h-screen selection:bg-bright-gold selection:text-void overflow-x-hidden">
             <Navbar />
@@ -40,13 +57,29 @@ export default function App() {
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-confirmation" element={<OrderConfirmation />} />
                 <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/products" element={<AdminProducts />} />
+                <Route path="/admin/products/:id" element={<AdminProductEdit />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/track-order" element={<TrackOrder />} />
+                <Route path="/track-order/:id" element={<TrackOrder />} />
+                <Route path="/authenticity" element={<Authenticity />} />
+                <Route path="/shipping" element={<Shipping />} />
+                <Route path="/returns" element={<Returns />} />
+                <Route path="/about-us" element={<AboutUs />} />
+                <Route path="/boutique-locations" element={<Boutiques />} />
+                <Route path="/consultation" element={<Consultation />} />
+                <Route path="/careers" element={<Careers />} />
+                <Route path="/contact" element={<Contact />} />
               </Routes>
             </main>
             <Footer />
           </div>
         </Router>
-      </WishlistProvider>
-    </AuthProvider>
+        </WishlistProvider>
+      </ToastProvider>
+    </CartProvider>
+  </AuthProvider>
   );
 }
 

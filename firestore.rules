@@ -83,6 +83,26 @@ service cloud.firestore {
         && data.createdAt == request.time;
     }
 
+    function isValidReview(data) {
+      return data.keys().hasAll(['userId', 'authorName', 'rating', 'comment', 'createdAt'])
+        && data.keys().size() >= 5
+        && data.userId is string && data.userId.size() <= 128
+        && data.authorName is string && data.authorName.size() > 0 && data.authorName.size() <= 100
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() >= 0 && data.comment.size() <= 1000
+        && data.createdAt == request.time;
+    }
+
+    function isValidAddress(data) {
+      return data.userId is string
+        && data.fullName is string
+        && data.streetAddress is string
+        && data.city is string
+        && data.state is string
+        && data.postalCode is string
+        && data.country is string;
+    }
+
     // ─── COLLECTIONS ──────────────────────────────
     
     // Products
@@ -91,6 +111,20 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
       allow update: if isAdmin() && isValidId(productId) && isValidProduct(incoming());
       allow delete: if isAdmin() && isValidId(productId);
+      
+      // Reviews (Subcollection)
+      match /reviews/{reviewId} {
+        allow get: if isValidId(productId) && isValidId(reviewId);
+        allow list: if isValidId(productId);
+        allow create: if isEmailVerified() && isValidId(productId) && isValidId(reviewId) 
+                      && isValidReview(incoming()) 
+                      && incoming().userId == request.auth.uid;
+        allow update: if isOwner(existing().userId) && isValidId(productId) && isValidId(reviewId) 
+                      && isValidReview(incoming())
+                      && incoming().userId == existing().userId
+                      && incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'comment', 'createdAt']);
+        allow delete: if isAdmin() && isValidId(productId) && isValidId(reviewId);
+      }
     }
 
     // Users
@@ -104,7 +138,9 @@ service cloud.firestore {
 
     // Cart (Subcollection)
     match /users/{userId}/cart/{itemId} {
-      allow read, write: if isOwner(userId) && isValidId(userId) && isValidId(itemId);
+      allow get: if isOwner(userId) && isValidId(userId) && isValidId(itemId);
+      allow list: if isOwner(userId) && isValidId(userId);
+      allow write: if isOwner(userId) && isValidId(userId) && isValidId(itemId);
     }
 
     // Orders
@@ -122,15 +158,25 @@ service cloud.firestore {
                     && incoming().updatedAt == request.time;
     }
 
+    // Addresses
+    match /addresses/{addressId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(incoming().userId) && isValidAddress(incoming());
+      allow update: if isOwner(existing().userId) && isOwner(incoming().userId);
+      allow delete: if isOwner(existing().userId);
+    }
+
     // Order Items
     match /orders/{orderId}/items/{itemId} {
-      allow read: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(itemId);
+      allow get: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(itemId);
+      allow list: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId);
       allow create: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(itemId) && isValidOrderItem(incoming());
     }
 
     // Order Updates (Timeline)
     match /orders/{orderId}/updates/{updateId} {
-      allow read: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(updateId);
+      allow get: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId) && isValidId(updateId);
+      allow list: if (isAdmin() || (isEmailVerified() && get(/databases/$(database)/documents/orders/$(orderId)).data.email == request.auth.token.email)) && isValidId(orderId);
       allow create: if isAdmin() && isValidId(orderId) && isValidId(updateId) && isValidOrderUpdate(incoming());
     }
   }

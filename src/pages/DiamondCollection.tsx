@@ -1,17 +1,60 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, ChevronDown, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { mockDiamonds } from '@/src/data/mockData';
+import { db } from '@/src/lib/firebase';
+import { collection, query, getDocs, where, limit } from 'firebase/firestore';
 import ProductCard from '@/src/components/ui/ProductCard';
 import Badge from '@/src/components/ui/Badge';
 import Button from '@/src/components/ui/Button';
 import { cn } from '@/src/lib/utils';
 import { DiamondShape } from '@/src/types';
+import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
 
 const DiamondCollection = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedShapes, setSelectedShapes] = useState<string[]>([]);
+  const [selectedLabs, setSelectedLabs] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState('popular');
+  const [diamonds, setDiamonds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDiamonds = async () => {
+      setLoading(true);
+      try {
+        // Fetching all products first (in a real app we'd filter on server-side more aggressively)
+        const q = query(collection(db, 'products'));
+        const snapshot = await getDocs(q);
+        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setDiamonds(fetched);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, 'products');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDiamonds();
+  }, []);
+
+  useEffect(() => {
+    const search = searchParams.get('search');
+    if (search !== null) {
+      setSearchQuery(search);
+    }
+  }, [searchParams]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    setSearchParams(prev => {
+      if (val) prev.set('search', val);
+      else prev.delete('search');
+      return prev;
+    }, { replace: true });
+  };
 
   const toggleShape = (shape: string) => {
     setSelectedShapes(prev => 
@@ -19,11 +62,25 @@ const DiamondCollection = () => {
     );
   };
 
-  const filteredDiamonds = mockDiamonds.filter(d => {
-    const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesShape = selectedShapes.length === 0 || selectedShapes.includes(d.shape);
-    return matchesSearch && matchesShape;
-  });
+  const toggleLab = (lab: string) => {
+    setSelectedLabs(prev => 
+      prev.includes(lab) ? prev.filter(l => l !== lab) : [...prev, lab]
+    );
+  };
+
+  const filteredDiamonds = diamonds
+    .filter(d => {
+      const matchesSearch = d.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesShape = selectedShapes.length === 0 || selectedShapes.includes(d.shape);
+      const matchesLab = selectedLabs.length === 0 || selectedLabs.includes(d.certification?.lab);
+      return matchesSearch && matchesShape && matchesLab;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'price-low') return a.price - b.price;
+      if (sortBy === 'price-high') return b.price - a.price;
+      if (sortBy === 'carat-high') return b.carat - a.carat;
+      return 0; // popular/default
+    });
 
   return (
     <div className="bg-void min-h-screen pt-24">
@@ -79,7 +136,16 @@ const DiamondCollection = () => {
               <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans text-bright-gold">Certification</h4>
               <div className="flex flex-wrap gap-2">
                 {['GIA', 'AGS', 'IGI'].map(lab => (
-                  <button key={lab} className="px-4 py-1 border border-white/10 text-[10px] uppercase font-mono text-ivory/60 hover:border-ivory">
+                  <button 
+                    key={lab} 
+                    onClick={() => toggleLab(lab)}
+                    className={cn(
+                      "px-4 py-1 border text-[10px] uppercase font-mono transition-all",
+                      selectedLabs.includes(lab)
+                        ? "border-bright-gold text-bright-gold bg-bright-gold/5"
+                        : "border-white/10 text-ivory/60 hover:border-ivory"
+                    )}
+                  >
                     {lab}
                   </button>
                 ))}
@@ -97,7 +163,7 @@ const DiamondCollection = () => {
                   type="text" 
                   placeholder="Search Diamonds..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={handleSearchChange}
                   className="w-full bg-graphite/30 border border-white/10 rounded-pill py-3 pl-12 pr-4 text-sm text-ivory focus:outline-none focus:border-bright-gold transition-colors"
                 />
               </div>
@@ -107,9 +173,31 @@ const DiamondCollection = () => {
                   Showing {filteredDiamonds.length} Diamonds
                 </p>
                 <div className="flex items-center gap-4">
-                  <button className="flex items-center gap-2 text-ivory text-xs uppercase tracking-widest font-sans group">
-                    Most Popular <ChevronDown className="w-4 h-4 text-bright-gold group-hover:translate-y-1 transition-transform" />
-                  </button>
+                  <div className="relative group/sort">
+                    <button className="flex items-center gap-2 text-ivory text-xs uppercase tracking-widest font-sans group">
+                      {sortBy === 'popular' ? 'Most Popular' : sortBy === 'price-low' ? 'Price: Low-High' : sortBy === 'price-high' ? 'Price: High-Low' : 'Largest Carat'} 
+                      <ChevronDown className="w-4 h-4 text-bright-gold group-hover:translate-y-1 transition-transform" />
+                    </button>
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-graphite border border-white/10 rounded-card py-4 opacity-0 invisible group-hover/sort:opacity-100 group-hover/sort:visible transition-all z-20 shadow-2xl">
+                      {[
+                        { id: 'popular', label: 'Most Popular' },
+                        { id: 'price-low', label: 'Price: Low-High' },
+                        { id: 'price-high', label: 'Price: High-Low' },
+                        { id: 'carat-high', label: 'Largest Carat' }
+                      ].map(option => (
+                        <button
+                          key={option.id}
+                          onClick={() => setSortBy(option.id)}
+                          className={cn(
+                            "w-full text-left px-6 py-2 text-[10px] uppercase tracking-[0.2em] font-mono hover:bg-white/5",
+                            sortBy === option.id ? "text-bright-gold" : "text-ivory/60"
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <button 
                     onClick={() => setIsFilterOpen(true)}
                     className="lg:hidden p-3 bg-graphite border border-white/10 rounded-pill text-ivory"
@@ -121,18 +209,26 @@ const DiamondCollection = () => {
             </div>
 
             {/* Active Filters */}
-            {selectedShapes.length > 0 && (
+            {(selectedShapes.length > 0 || selectedLabs.length > 0) && (
               <div className="flex flex-wrap gap-2 mb-8">
                 {selectedShapes.map(shape => (
-                  <span key={shape}>
+                  <div key={shape}>
                     <Badge variant="gold" className="px-4 py-1 gap-2 border border-bright-gold/20 flex items-center">
                       {shape}
                       <X className="w-3 h-3 cursor-pointer" onClick={() => toggleShape(shape)} />
                     </Badge>
-                  </span>
+                  </div>
+                ))}
+                {selectedLabs.map(lab => (
+                  <div key={lab}>
+                    <Badge variant="ivory" className="px-4 py-1 gap-2 border border-white/20 flex items-center">
+                      {lab}
+                      <X className="w-3 h-3 cursor-pointer" onClick={() => toggleLab(lab)} />
+                    </Badge>
+                  </div>
                 ))}
                 <button 
-                  onClick={() => setSelectedShapes([])}
+                  onClick={() => {setSelectedShapes([]); setSelectedLabs([]);}}
                   className="text-[10px] uppercase font-mono tracking-widest text-muted-text hover:text-ivory"
                 >
                   Clear All
@@ -168,7 +264,7 @@ const DiamondCollection = () => {
                 <p className="text-ivory/60 font-sans max-w-sm mx-auto mb-8">
                   Try adjusting your filters or search criteria. We have many more diamonds arriving daily.
                 </p>
-                <button onClick={() => {setSearchQuery(''); setSelectedShapes([]);}} className="text-bright-gold uppercase text-[11px] font-mono tracking-widest hover:underline">
+                <button onClick={() => {setSearchQuery(''); setSelectedShapes([]); setSelectedLabs([]);}} className="text-bright-gold uppercase text-[11px] font-mono tracking-widest hover:underline">
                   Reset All Filters
                 </button>
               </div>
@@ -228,7 +324,16 @@ const DiamondCollection = () => {
                   <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans text-bright-gold">Certification</h4>
                   <div className="flex flex-wrap gap-2">
                     {['GIA', 'AGS', 'IGI'].map(lab => (
-                      <button key={lab} className="px-6 py-2 border border-white/10 text-[10px] uppercase font-mono text-ivory/60">
+                      <button 
+                        key={lab} 
+                        onClick={() => toggleLab(lab)}
+                        className={cn(
+                          "px-6 py-2 border text-[10px] uppercase font-mono",
+                          selectedLabs.includes(lab)
+                            ? "border-bright-gold text-bright-gold bg-bright-gold/5"
+                            : "border-white/10 text-ivory/60"
+                        )}
+                      >
                         {lab}
                       </button>
                     ))}

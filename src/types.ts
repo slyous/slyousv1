@@ -44,6 +44,7 @@ export interface Diamond {
   slug: string;
   name: string;
   price: number;
+  marketPrice?: number;
   originalPrice?: number;
   carat: number;
   cut: DiamondCut;
@@ -75,6 +76,27 @@ export enum OrderStatus {
   SHIPPED = 'Shipped',
   DELIVERED = 'Delivered',
   CANCELLED = 'Cancelled'
+}
+
+export interface Review {
+  id: string;
+  userId: string;
+  authorName: string;
+  rating: number;
+  comment: string;
+  createdAt: any;
+}
+
+export interface Address {
+  id: string;
+  userId: string;
+  fullName: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  isDefault: boolean;
 }
 
 export interface OrderUpdate {

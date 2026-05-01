@@ -1,19 +1,14 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Trash2, ShoppingBag, ArrowRight, Minus, Plus } from 'lucide-react';
-import { mockDiamonds } from '@/src/data/mockData';
 import { formatCurrency } from '@/src/lib/utils';
 import Button from '@/src/components/ui/Button';
+import { useCart } from '@/src/context/CartContext';
 
 const Cart = () => {
-  // Mock cart items based on the data
-  const cartItems = [
-    { diamond: mockDiamonds[0], quantity: 1 },
-    { diamond: mockDiamonds[3], quantity: 1 },
-  ];
+  const { cart, removeFromCart, updateQuantity, subtotal } = useCart();
 
-  const subtotal = cartItems.reduce((acc, item) => acc + (item.diamond.price * item.quantity), 0);
-
-  if (cartItems.length === 0) {
+  if (cart.length === 0) {
     return (
       <div className="pt-48 pb-32 px-6 flex flex-col items-center justify-center text-center">
         <div className="w-24 h-24 rounded-full bg-graphite/30 flex items-center justify-center text-muted-text mb-8">
@@ -45,7 +40,7 @@ const Cart = () => {
               <div className="text-right">Total</div>
             </div>
 
-            {cartItems.map((item) => (
+            {cart.map((item) => (
               <div key={item.diamond.id} className="grid grid-cols-1 md:grid-cols-6 gap-8 items-center pb-8 border-b border-white/5 group">
                 {/* Product Info */}
                 <div className="md:col-span-3 flex items-center gap-6">
@@ -59,7 +54,10 @@ const Cart = () => {
                     <p className="text-xs text-muted-text font-mono mt-1 uppercase tracking-widest">
                       {item.diamond.carat}CT · {item.diamond.cut} · {item.diamond.shape}
                     </p>
-                    <button className="flex items-center gap-2 text-crimson font-mono text-[10px] uppercase tracking-widest mt-4 hover:opacity-80 transition-opacity">
+                    <button 
+                      onClick={() => removeFromCart(item.diamond.id)}
+                      className="flex items-center gap-2 text-crimson font-mono text-[10px] uppercase tracking-widest mt-4 hover:opacity-80 transition-opacity"
+                    >
                       <Trash2 className="w-3 h-3" />
                       Remove
                     </button>
@@ -69,9 +67,19 @@ const Cart = () => {
                 {/* Quantity */}
                 <div className="flex justify-center">
                   <div className="flex items-center gap-4 bg-graphite/30 border border-white/5 rounded-pill px-4 py-2">
-                    <button className="text-ivory hover:text-bright-gold"><Minus className="w-3 h-3" /></button>
+                    <button 
+                      onClick={() => updateQuantity(item.diamond.id, item.quantity - 1)}
+                      className="text-ivory hover:text-bright-gold"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
                     <span className="text-white font-mono text-sm w-4 text-center">{item.quantity}</span>
-                    <button className="text-ivory hover:text-bright-gold"><Plus className="w-3 h-3" /></button>
+                    <button 
+                      onClick={() => updateQuantity(item.diamond.id, item.quantity + 1)}
+                      className="text-ivory hover:text-bright-gold"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
 
