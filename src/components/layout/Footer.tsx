@@ -43,26 +43,20 @@ const Footer = () => {
           <div>
             <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans text-bright-gold mb-8">Service</h4>
             <ul className="space-y-4">
-              {['Certification', 'Insurance', 'Authenticity', 'Shipping', 'Returns'].map((item) => (
-                <li key={item}>
-                  <Link to="#" className="text-ivory/60 hover:text-white transition-colors flex items-center group">
-                    {item}
-                  </Link>
-                </li>
-              ))}
+              <li><Link to="/authenticity" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Authenticity</Link></li>
+              <li><Link to="/shipping" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Shipping</Link></li>
+              <li><Link to="/returns" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Returns</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-[11px] uppercase tracking-[0.2em] font-sans text-bright-gold mb-8">Company</h4>
             <ul className="space-y-4">
-              {['About Us', 'Boutique Locations', 'Consultation', 'Careers', 'Contact'].map((item) => (
-                <li key={item}>
-                  <Link to="#" className="text-ivory/60 hover:text-white transition-colors flex items-center group">
-                    {item}
-                  </Link>
-                </li>
-              ))}
+              <li><Link to="/about-us" className="text-ivory/60 hover:text-white transition-colors flex items-center group">About Us</Link></li>
+              <li><Link to="/boutique-locations" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Boutique Locations</Link></li>
+              <li><Link to="/consultation" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Consultation</Link></li>
+              <li><Link to="/careers" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Careers</Link></li>
+              <li><Link to="/contact" className="text-ivory/60 hover:text-white transition-colors flex items-center group">Contact</Link></li>
             </ul>
           </div>
         </div>

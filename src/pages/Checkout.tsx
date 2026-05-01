@@ -1,11 +1,91 @@
-import { Link } from 'react-router-dom';
-import { ChevronRight, ArrowLeft } from 'lucide-react';
-import { mockDiamonds } from '@/src/data/mockData';
-import { formatCurrency } from '@/src/lib/utils';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronRight, ArrowLeft, Truck, Zap, Clock } from 'lucide-react';
+import { formatCurrency, cn } from '@/src/lib/utils';
 import Button from '@/src/components/ui/Button';
+import { useCart } from '@/src/context/CartContext';
+import { useToast } from '@/src/context/ToastContext';
+import { useAuth } from '@/src/context/AuthContext';
+import { db } from '@/src/lib/firebase';
+import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { OrderStatus } from '@/src/types';
+
+const SHIPPING_OPTIONS = [
+  { id: 'standard', name: 'Standard', cost: 0, time: '5-7 business days', icon: Truck },
+  { id: 'express', name: 'Express', cost: 50, time: '2-3 business days', icon: Zap },
+  { id: 'overnight', name: 'Overnight', cost: 100, time: 'Next business day', icon: Clock },
+];
 
 const Checkout = () => {
-  const subtotal = mockDiamonds[0].price + mockDiamonds[3].price;
+  const { cart, subtotal, clearCart } = useCart();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+  const [selectedShipping, setSelectedShipping] = useState(SHIPPING_OPTIONS[0]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form State
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState(user?.displayName || '');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) return;
+    
+    setIsSubmitting(true);
+    try {
+      const orderNumber = `VEL-${Math.floor(100000 + Math.random() * 900000)}`;
+      const orderData = {
+        orderNumber,
+        userId: user?.uid || 'guest',
+        email,
+        phone,
+        status: OrderStatus.PENDING,
+        totalPrice: subtotal + selectedShipping.cost,
+        shippingAddress: {
+          fullName,
+          streetAddress,
+          city,
+          state,
+          country: 'Nigeria' // Desktop demo default
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      
+      // Add items as subcollection
+      const batch = writeBatch(db);
+      for (const item of cart) {
+        const itemRef = doc(collection(db, `orders/${orderRef.id}/items`));
+        batch.set(itemRef, {
+          productId: item.diamond.id,
+          name: item.diamond.name,
+          price: item.diamond.price,
+          quantity: item.quantity,
+          image: item.diamond.images?.[0] || ''
+        });
+      }
+      await batch.commit();
+
+      showToast("Order placed successfully!", "success");
+      clearCart();
+      navigate('/order-confirmation', { state: { orderId: orderRef.id, orderNumber } });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'orders');
+      showToast("Failed to place order. Please try again.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const total = subtotal + selectedShipping.cost;
 
   return (
     <div className="bg-void min-h-screen pt-32 pb-32 px-6 lg:px-12">
@@ -39,17 +119,31 @@ const Checkout = () => {
           </div>
 
           {/* Shipping Form */}
-          <div className="space-y-12">
+          <form onSubmit={handlePlaceOrder} className="space-y-12">
             <section>
               <h3 className="text-xl font-serif text-white italic mb-8 border-b border-white/5 pb-4">Contact Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">Email Address</label>
-                  <input type="email" placeholder="email@example.com" className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" />
+                  <input 
+                    type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="email@example.com" 
+                    className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">Phone Number</label>
-                  <input type="tel" placeholder="+234 ..." className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" />
+                  <input 
+                    type="tel" 
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+234 ..." 
+                    className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                  />
                 </div>
               </div>
             </section>
@@ -59,29 +153,101 @@ const Checkout = () => {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">Full Name</label>
-                  <input type="text" placeholder="Abba Abdulsalam" className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" />
+                  <input 
+                    type="text" 
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Abba Abdulsalam" 
+                    className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">Street Address</label>
-                  <input type="text" placeholder="123 Luxury Avenue" className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" />
+                  <input 
+                    type="text" 
+                    required
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder="123 Luxury Avenue" 
+                    className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">City</label>
-                    <input type="text" placeholder="Lagos" className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" />
+                    <input 
+                      type="text" 
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Lagos" 
+                      className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">State / Province</label>
-                    <input type="text" placeholder="Lagos State" className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" />
+                    <input 
+                      type="text" 
+                      required
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      placeholder="Lagos State" 
+                      className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                    />
                   </div>
                 </div>
               </div>
             </section>
+            
+            <section>
+              <h3 className="text-xl font-serif text-white italic mb-8 border-b border-white/5 pb-4">Shipping Method</h3>
+              <div className="space-y-4">
+                {SHIPPING_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSelectedShipping(option)}
+                    className={cn(
+                      "w-full flex items-center justify-between p-6 rounded-section-card border transition-all text-left",
+                      selectedShipping.id === option.id 
+                        ? "bg-bright-gold/5 border-bright-gold" 
+                        : "bg-graphite/20 border-white/5 hover:border-white/20"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex items-center justify-center",
+                        selectedShipping.id === option.id ? "bg-bright-gold/20 text-bright-gold" : "bg-white/5 text-muted-text"
+                      )}>
+                        <option.icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium mb-1">{option.name}</p>
+                        <p className="text-xs text-muted-text font-mono">{option.time}</p>
+                      </div>
+                    </div>
+                    <div>
+                      {option.cost === 0 ? (
+                        <span className="text-emerald-400 font-mono text-xs uppercase">Complimentary</span>
+                      ) : (
+                        <span className="text-bright-gold">{formatCurrency(option.cost)}</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
 
-            <Link to="/order-confirmation">
-              <Button size="lg" className="w-full h-16 mt-8">Continue to Payment</Button>
-            </Link>
-          </div>
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="w-full h-16 mt-8" 
+              disabled={isSubmitting || cart.length === 0}
+            >
+              {isSubmitting ? 'Confirming Order...' : 'Complete Payment'}
+            </Button>
+          </form>
         </div>
 
         {/* Right: Order Summary */}
@@ -90,15 +256,15 @@ const Checkout = () => {
             <h2 className="text-2xl font-serif text-white italic mb-10">Order Summary</h2>
             
             <div className="space-y-8 mb-10 pb-10 border-b border-white/5">
-              {[mockDiamonds[0], mockDiamonds[3]].map((diamond) => (
-                <div key={diamond.id} className="flex gap-6">
+              {cart.map((item) => (
+                <div key={item.diamond.id} className="flex gap-6">
                   <div className="w-20 h-20 bg-white rounded-card p-2 flex-shrink-0">
-                    <img src={diamond.images[0]} alt={diamond.name} className="w-full h-full object-contain mix-blend-multiply" />
+                    <img src={item.diamond.images[0]} alt={item.diamond.name} className="w-full h-full object-contain mix-blend-multiply" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-white font-sans text-sm font-medium mb-1">{diamond.name}</h4>
-                    <p className="text-[10px] font-mono tracking-widest text-muted-text uppercase">{diamond.carat}CT · {diamond.shape}</p>
-                    <p className="text-bright-gold text-sm mt-2">{formatCurrency(diamond.price)}</p>
+                    <h4 className="text-white font-sans text-sm font-medium mb-1">{item.diamond.name}</h4>
+                    <p className="text-[10px] font-mono tracking-widest text-muted-text uppercase">{item.diamond.carat}CT · {item.diamond.shape} x{item.quantity}</p>
+                    <p className="text-bright-gold text-sm mt-2">{formatCurrency(item.diamond.price * item.quantity)}</p>
                   </div>
                 </div>
               ))}
@@ -111,11 +277,15 @@ const Checkout = () => {
               </div>
               <div className="flex justify-between text-ivory/60 text-sm">
                 <span>Secure Shipping</span>
-                <span className="text-emerald-400 font-mono text-[10px] uppercase">Complimentary</span>
+                {selectedShipping.cost === 0 ? (
+                  <span className="text-emerald-400 font-mono text-[10px] uppercase">Complimentary</span>
+                ) : (
+                  <span className="text-ivory">{formatCurrency(selectedShipping.cost)}</span>
+                )}
               </div>
               <div className="flex justify-between text-white font-medium text-lg pt-4">
                 <span>Total</span>
-                <span className="text-bright-gold">{formatCurrency(subtotal)}</span>
+                <span className="text-bright-gold">{formatCurrency(total)}</span>
               </div>
             </div>
 

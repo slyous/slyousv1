@@ -8,6 +8,7 @@
         "name": { "type": "string" },
         "slug": { "type": "string" },
         "price": { "type": "number" },
+        "marketPrice": { "type": "number" },
         "carat": { "type": "number" },
         "cut": { "type": "string" },
         "clarity": { "type": "string" },
@@ -87,10 +88,24 @@
         "quantity": { "type": "number" }
       },
       "required": ["productId", "quantity"]
+    },
+    "Review": {
+      "title": "Product Review",
+      "description": "Customer review for a product.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "authorName", "rating", "comment", "createdAt"]
     }
   },
   "firestore": {
     "products": { "schema": "Product", "description": "Collection of diamonds" },
+    "products/{productId}/reviews": { "schema": "Review", "description": "Product reviews" },
     "users": { "schema": "User", "description": "User profiles" },
     "users/{userId}/cart": { "schema": "CartItem", "description": "User cart items" },
     "orders": { "schema": "Order", "description": "Customer orders" },

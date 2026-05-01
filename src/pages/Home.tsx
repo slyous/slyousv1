@@ -1,12 +1,32 @@
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
-import { useRef } from 'react';
 import { ArrowRight, MessageCircle, ShieldCheck, Truck, Scale, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ProductCard from '@/src/components/ui/ProductCard';
-import { mockDiamonds } from '@/src/data/mockData';
 import { cn } from '@/src/lib/utils';
+import { db } from '@/src/lib/firebase';
+import { collection, query, limit, getDocs } from 'firebase/firestore';
 
 const Home = () => {
+  const [diamonds, setDiamonds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      try {
+        const q = query(collection(db, 'products'), limit(5));
+        const snapshot = await getDocs(q);
+        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setDiamonds(fetched);
+      } catch (error) {
+        console.error("Error fetching featured diamonds:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFeatured();
+  }, []);
+
   const heroRef = useRef(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -69,7 +89,7 @@ const Home = () => {
                   transform: 'translate(-50%, -50%)'
                 }}
               >
-                <img src={src} alt="Diamond Luxury" className="w-full h-full object-cover" />
+                <img src={src} alt="Diamond Luxury" loading="lazy" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-void via-transparent to-transparent opacity-40" />
               </motion.div>
             );
@@ -145,9 +165,19 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-8">
-            {mockDiamonds.slice(0, 5).map((diamond) => (
-              <ProductCard key={diamond.id} diamond={diamond} />
-            ))}
+            {loading ? (
+              Array(5).fill(0).map((_, i) => (
+                <div key={i} className="aspect-[4/5] bg-graphite/20 animate-pulse rounded-card" />
+              ))
+            ) : diamonds.length > 0 ? (
+              diamonds.map((diamond) => (
+                <ProductCard key={diamond.id} diamond={diamond} />
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center text-ivory/40 font-mono text-xs uppercase tracking-widest border border-dashed border-white/10 rounded-card">
+                No featured diamonds at the moment
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -159,6 +189,7 @@ const Home = () => {
             <img 
               src="https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?q=80&w=1200&auto=format&fit=crop" 
               alt="Editorial Jewelry" 
+              loading="lazy"
               className="w-full h-full object-cover grayscale brightness-75"
             />
           </div>

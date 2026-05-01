@@ -7,7 +7,7 @@ import { doc, getDocFromCache, getDocFromServer } from 'firebase/firestore';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
 async function testConnection() {
