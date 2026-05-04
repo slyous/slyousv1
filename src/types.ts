@@ -70,11 +70,15 @@ export interface CartItem {
 }
 
 export enum OrderStatus {
-  PENDING = 'Pending',
-  CONFIRMED = 'Confirmed',
-  PROCESSING = 'Processing',
-  SHIPPED = 'Shipped',
+  CREATED = 'Created',
+  PENDING_CONFIRMATION = 'Pending Confirmation',
+  PAYMENT_RECEIVED = 'Payment Received',
+  PROCESSING = 'Processing Packaging',
+  HANDED_TO_COURIER = 'Handed over to Courier',
+  DISPATCHED = 'Dispatched',
+  OUT_FOR_DELIVERY = 'Out for Delivery',
   DELIVERED = 'Delivered',
+  FULFILLED = 'Fulfilled',
   CANCELLED = 'Cancelled'
 }
 

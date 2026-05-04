@@ -130,11 +130,10 @@ const Cart = () => {
               </Link>
               
               <div className="mt-8 pt-8 border-t border-white/5 text-center">
-                <p className="text-[10px] font-mono text-muted-text uppercase tracking-widest mb-4">Secured with Paystack</p>
+                <p className="text-[10px] font-mono text-muted-text uppercase tracking-widest mb-4">Secure Bank Wire Transfer</p>
                 <div className="flex justify-center gap-4 opacity-40">
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" className="h-4" alt="paypal" />
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" className="h-4" alt="visa" />
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" className="h-4" alt="mastercard" />
+                  {/* Providing a generic bank building icon for wire transfer visual trust */}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="21" width="18" height="2"/><path d="M21 11v8"/><path d="M3 11v8"/><path d="M7 11v8"/><path d="M11 11v8"/><path d="M15 11v8"/><path d="M19 11v8"/><path d="m12 2-9 5v4h18V7l-9-5z"/></svg>
                 </div>
               </div>
             </div>

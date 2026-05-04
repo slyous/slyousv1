@@ -13,8 +13,6 @@ import { OrderStatus } from '@/src/types';
 
 const SHIPPING_OPTIONS = [
   { id: 'standard', name: 'Standard', cost: 0, time: '5-7 business days', icon: Truck },
-  { id: 'express', name: 'Express', cost: 50, time: '2-3 business days', icon: Zap },
-  { id: 'overnight', name: 'Overnight', cost: 100, time: 'Next business day', icon: Clock },
 ];
 
 const Checkout = () => {
@@ -32,6 +30,8 @@ const Checkout = () => {
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('');
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,14 +45,15 @@ const Checkout = () => {
         userId: user?.uid || 'guest',
         email,
         phone,
-        status: OrderStatus.PENDING,
+        status: OrderStatus.CREATED,
         totalPrice: subtotal + selectedShipping.cost,
         shippingAddress: {
           fullName,
           streetAddress,
           city,
           state,
-          country: 'Nigeria' // Desktop demo default
+          postalCode,
+          country
         },
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -74,9 +75,37 @@ const Checkout = () => {
       }
       await batch.commit();
 
+      if (email) {
+        try {
+          // Fire and forget email
+          fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: email,
+              subject: `Order Confirmation - Vellandi Diamonds #${orderNumber}`,
+              text: `Thank you for your order!\n\nYour order #${orderNumber} has been successfully placed. We will contact you shortly with wire transfer instructions.\n\nTotal: ${formatCurrency(total)}\n\nTrack your order at: ${window.location.origin}/track-order/${orderRef.id}?email=${encodeURIComponent(email)}`,
+              html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A0A; color: #FFFFFF; padding: 40px; border-radius: 8px;">
+                   <h1 style="color: #D4AF37; font-family: Georgia, serif; font-style: italic;">Vellandi Diamonds</h1>
+                   <h2 style="font-size: 18px; margin-bottom: 20px;">Order Confirmation</h2>
+                   <p style="color: #EAEAEA; line-height: 1.6;">Thank you for your acquisition. Your order <strong style="font-family: monospace;">#${orderNumber}</strong> has been successfully placed.</p>
+                   <p style="color: #EAEAEA; line-height: 1.6;">Please complete your wire transfer to begin processing. You will receive an email from our concierge desk with explicit wire instructions shortly.</p>
+                   <h3 style="color: #D4AF37; margin-top: 30px; font-size: 16px;">Acquisition Summary</h3>
+                   <p style="color: #A0A0A0;">Total: ${formatCurrency(total)}</p>
+                   <a href="${window.location.origin}/track-order/${orderRef.id}?email=${encodeURIComponent(email)}" style="display: inline-block; margin-top: 30px; padding: 12px 24px; background: #D4AF37; color: #0A0A0A; text-decoration: none; border-radius: 4px; font-weight: bold;">Track Your Order</a>
+                </div>
+              `
+            })
+          });
+        } catch (e) {
+          console.error("Failed to send order placed notification", e);
+        }
+      }
+
       showToast("Order placed successfully!", "success");
       clearCart();
-      navigate('/order-confirmation', { state: { orderId: orderRef.id, orderNumber } });
+      navigate(`/checkout/wire/${orderRef.id}`);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'orders');
       showToast("Failed to place order. Please try again.", "error");
@@ -181,7 +210,7 @@ const Checkout = () => {
                       required
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      placeholder="Lagos" 
+                      placeholder="New York" 
                       className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
                     />
                   </div>
@@ -192,7 +221,31 @@ const Checkout = () => {
                       required
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      placeholder="Lagos State" 
+                      placeholder="NY" 
+                      className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">Postal Code</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      placeholder="10001" 
+                      className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-text">Country</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="United States of America" 
                       className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
                     />
                   </div>
@@ -245,7 +298,7 @@ const Checkout = () => {
               className="w-full h-16 mt-8" 
               disabled={isSubmitting || cart.length === 0}
             >
-              {isSubmitting ? 'Confirming Order...' : 'Complete Payment'}
+              {isSubmitting ? 'Confirming Order...' : 'Proceed to Wire Transfer'}
             </Button>
           </form>
         </div>

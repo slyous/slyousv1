@@ -21,11 +21,10 @@ const Badge = ({ children, variant = 'default', status, className, ...props }: B
   };
 
   const statusVariants: Record<string, string> = {
-    [OrderStatus.PENDING]: variants.default,
-    [OrderStatus.CONFIRMED]: variants.info,
-    [OrderStatus.PROCESSING]: variants.warning,
-    [OrderStatus.SHIPPED]: variants.info,
-    [OrderStatus.DELIVERED]: variants.success,
+    [OrderStatus.CREATED]: variants.default,
+    [OrderStatus.PENDING_CONFIRMATION]: variants.warning,
+    [OrderStatus.PAYMENT_RECEIVED]: variants.info,
+    [OrderStatus.FULFILLED]: variants.success,
     [OrderStatus.CANCELLED]: variants.danger,
   };
 

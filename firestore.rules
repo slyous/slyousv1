@@ -64,7 +64,7 @@ service cloud.firestore {
         && data.keys().size() >= 5
         && data.email is string && data.email.size() > 0 && data.email.size() <= 100
         && data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 20
-        && data.status in ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
+        && data.status in ['Created', 'Pending Confirmation', 'Payment Received', 'Processing Packaging', 'Handed over to Courier', 'Dispatched', 'Out for Delivery', 'Delivered', 'Fulfilled', 'Cancelled']
         && data.totalPrice is number && data.totalPrice >= 0
         && data.shippingAddress is map;
     }
@@ -150,12 +150,13 @@ service cloud.firestore {
       
       allow create: if isEmailVerified() && isValidId(orderId) && isValidOrder(incoming()) 
                     && incoming().email == request.auth.token.email
-                    && incoming().status == 'PENDING'
+                    && incoming().status == 'Created'
                     && incoming().createdAt == request.time;
       
-      allow update: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
-                    && (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'trackingNumber', 'courier', 'updatedAt']))
-                    && incoming().updatedAt == request.time;
+      allow update: if isValidId(orderId) && isValidOrder(incoming()) && (
+                      (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'trackingNumber', 'courier', 'updatedAt']) && incoming().updatedAt == request.time) ||
+                      (isEmailVerified() && existing().email == request.auth.token.email && incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status == 'Pending Confirmation')
+                    );
     }
 
     // Addresses

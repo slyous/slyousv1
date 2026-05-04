@@ -8,8 +8,10 @@ import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Wishlist from './pages/Wishlist';
 import Checkout from './pages/Checkout';
+import WireTransferCheckout from './pages/WireTransferCheckout';
 import OrderConfirmation from './pages/OrderConfirmation';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminOrders from './pages/AdminOrders';
 import TrackOrder from './pages/TrackOrder';
 import Login from './pages/Login';
 import Account from './pages/Account';
@@ -55,8 +57,10 @@ export default function App() {
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
+                <Route path="/checkout/wire/:id" element={<WireTransferCheckout />} />
                 <Route path="/order-confirmation" element={<OrderConfirmation />} />
                 <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/orders" element={<AdminOrders />} />
                 <Route path="/admin/products" element={<AdminProducts />} />
                 <Route path="/admin/products/:id" element={<AdminProductEdit />} />
                 <Route path="/login" element={<Login />} />

@@ -7,6 +7,7 @@ const OrderConfirmation = () => {
   const location = useLocation();
   const orderId = location.state?.orderId;
   const orderNumber = location.state?.orderNumber || orderId?.substring(0, 8).toUpperCase() || 'VLR-2026-9932';
+  const wirePending = location.state?.wirePending;
 
   return (
     <div className="bg-void min-h-screen pt-48 pb-32 px-6 flex flex-col items-center justify-center text-center">
@@ -32,7 +33,7 @@ const OrderConfirmation = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-4xl md:text-5xl font-serif text-white italic mb-6"
         >
-          Your diamond is on its way.
+          {wirePending ? "Your acquisition is pending verification." : "Your diamond is on its way."}
         </motion.h1>
 
         <motion.div

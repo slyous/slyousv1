@@ -32,7 +32,7 @@ const Account = () => {
       try {
         const q = query(
           collection(db, 'orders'),
-          where('userId', '==', user.uid)
+          where('email', '==', user.email)
         );
         const snapshot = await getDocs(q);
         const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => {
@@ -270,19 +270,19 @@ const Account = () => {
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">City</label>
-                               <input required value={currentAddress.city || ''} onChange={e => setCurrentAddress({...currentAddress, city: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="New York" value={currentAddress.city || ''} onChange={e => setCurrentAddress({...currentAddress, city: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">State / Province</label>
-                               <input required value={currentAddress.state || ''} onChange={e => setCurrentAddress({...currentAddress, state: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="NY" value={currentAddress.state || ''} onChange={e => setCurrentAddress({...currentAddress, state: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">Postal Code</label>
-                               <input required value={currentAddress.postalCode || ''} onChange={e => setCurrentAddress({...currentAddress, postalCode: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="10001" value={currentAddress.postalCode || ''} onChange={e => setCurrentAddress({...currentAddress, postalCode: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">Country</label>
-                               <input required value={currentAddress.country || ''} onChange={e => setCurrentAddress({...currentAddress, country: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="United States of America" value={currentAddress.country || ''} onChange={e => setCurrentAddress({...currentAddress, country: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                           </div>
                           <div className="flex items-center gap-4 pt-4 mt-6 border-t border-white/5">
