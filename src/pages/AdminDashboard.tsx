@@ -103,7 +103,7 @@ const AdminDashboard = () => {
         <div className="bg-graphite/20 border border-white/5 rounded-section-card overflow-hidden">
           <div className="p-8 border-b border-white/5 flex justify-between items-center">
             <h2 className="text-xl font-serif text-white italic">Recent Acquisitions</h2>
-            <button className="text-xs uppercase tracking-widest text-bright-gold hover:underline">View All Orders</button>
+            <Link to="/admin/orders" className="text-xs uppercase tracking-widest text-bright-gold hover:underline">View All Orders</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -135,7 +135,7 @@ const AdminDashboard = () => {
                       </td>
                       <td className="p-8 text-bright-gold">{formatCurrency(order.totalPrice || 0)}</td>
                       <td className="p-8">
-                        <Link to={`/admin/orders/${order.id}`} className="text-xs uppercase tracking-widest text-muted hover:text-white">Manage</Link>
+                        <Link to={`/admin/orders`} className="text-xs uppercase tracking-widest text-muted hover:text-white">Manage</Link>
                       </td>
                     </tr>
                   ))

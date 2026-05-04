@@ -11,11 +11,15 @@ import Button from '@/src/components/ui/Button';
 // Utility for timeline icon
 const getStatusIcon = (status: string) => {
   switch (status) {
-    case 'PENDING': return <Clock className="w-5 h-5 text-blue-400" />;
-    case 'CONFIRMED': return <CheckCircle className="w-5 h-5 text-bright-gold" />;
-    case 'PROCESSING': return <Package className="w-5 h-5 text-purple-400" />;
-    case 'SHIPPED': return <Truck className="w-5 h-5 text-orange-400" />;
-    case 'DELIVERED': return <MapPin className="w-5 h-5 text-success" />;
+    case OrderStatus.CREATED: return <Clock className="w-5 h-5 text-blue-400" />;
+    case OrderStatus.PENDING_CONFIRMATION: return <Clock className="w-5 h-5 text-orange-400" />;
+    case OrderStatus.PAYMENT_RECEIVED: return <CheckCircle className="w-5 h-5 text-bright-gold" />;
+    case OrderStatus.PROCESSING: return <Package className="w-5 h-5 text-purple-400" />;
+    case OrderStatus.HANDED_TO_COURIER: return <Truck className="w-5 h-5 text-ivory/60" />;
+    case OrderStatus.DISPATCHED: return <Truck className="w-5 h-5 text-ivory" />;
+    case OrderStatus.OUT_FOR_DELIVERY: return <Truck className="w-5 h-5 text-orange-400" />;
+    case OrderStatus.DELIVERED: return <MapPin className="w-5 h-5 text-emerald-400" />;
+    case OrderStatus.FULFILLED: return <CheckCircle className="w-5 h-5 text-emerald-400" />;
     default: return <Clock className="w-5 h-5 text-muted-text" />;
   }
 };
@@ -49,10 +53,19 @@ const TrackOrder = () => {
         orderId = snap.id;
       } else {
         // Try searching by orderNumber
-        const q = query(
-          collection(db, 'orders'),
-          where('orderNumber', '==', idOrNumber.trim().toUpperCase())
-        );
+        let q;
+        if (emailStr) {
+          q = query(
+            collection(db, 'orders'),
+            where('orderNumber', '==', idOrNumber.trim().toUpperCase()),
+            where('email', '==', emailStr.trim().toLowerCase())
+          );
+        } else {
+          q = query(
+            collection(db, 'orders'),
+            where('orderNumber', '==', idOrNumber.trim().toUpperCase())
+          );
+        }
         const querySnap = await getDocs(q);
         if (!querySnap.empty) {
           const doc = querySnap.docs[0];
@@ -184,7 +197,7 @@ const TrackOrder = () => {
                 </p>
               </div>
               <div className="text-right">
-                <Badge status={order?.status as OrderStatus || OrderStatus.PENDING} className="px-4 py-2 text-sm">{order?.status || 'PENDING'}</Badge>
+                <Badge status={order?.status as OrderStatus || OrderStatus.CREATED} className="px-4 py-2 text-sm">{order?.status || 'CREATED'}</Badge>
               </div>
             </div>
 
@@ -197,7 +210,7 @@ const TrackOrder = () => {
                 <div className="bg-graphite/20 border border-white/5 rounded-section-card p-8">
                   {loading ? (
                     <div className="text-center py-10 text-ivory/50">Retrieving timeline...</div>
-                  ) : updates.length === 0 ? (
+                  ) : updates.length === 0 && !order ? (
                     <div className="text-center py-10 text-ivory/50">No updates available yet.</div>
                   ) : (
                     <div className="relative">
@@ -205,7 +218,7 @@ const TrackOrder = () => {
                       <div className="absolute left-6 top-10 bottom-10 w-px bg-white/10 z-0"></div>
                       
                       <div className="space-y-8 relative z-10">
-                        {updates.map((update, idx) => (
+                        {(updates.length > 0 ? updates : [{ id: 'init', status: order?.status || OrderStatus.CREATED, createdAt: order?.createdAt, message: 'Order has been placed.' }]).map((update: any, idx: number) => (
                           <motion.div 
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}

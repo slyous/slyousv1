@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import admin from 'firebase-admin';
+import nodemailer from 'nodemailer';
 
 // Initialize Firebase Admin
 // In this environment, it will pick up credentials if properly configured, 
@@ -21,6 +22,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  app.set('trust proxy', 1);
   const PORT = 3000;
 
   // Middleware
@@ -60,6 +62,47 @@ async function startServer() {
     }
     next();
   };
+
+  // Email API
+  app.post('/api/send-email', async (req, res) => {
+    try {
+      const { to, subject, text, html } = req.body;
+      
+      // If we don't have SMTP configured, we just log it and simulate success
+      if (!process.env.SMTP_HOST) {
+        console.log('--- MOCK EMAIL SENT ---');
+        console.log(`To: ${to}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`Text: ${text}`);
+        console.log('-----------------------');
+        return res.json({ success: true, message: 'Mock email sent (configure SMTP_HOST to send real emails)' });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      const info = await transporter.sendMail({
+        from: process.env.SMTP_FROM || '"Vellandi Diamonds" <noreply@vellandi.com>',
+        to,
+        subject,
+        text,
+        html: html || text,
+      });
+
+      console.log('Email sent: %s', info.messageId);
+      res.json({ success: true, messageId: info.messageId });
+    } catch (error) {
+      console.error('Error sending email:', error);
+      res.status(500).json({ error: 'Failed to send email' });
+    }
+  });
 
   // Products API
   app.get('/api/products', async (req, res) => {
