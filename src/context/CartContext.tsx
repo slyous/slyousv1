@@ -1,13 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-interface CartItem {
-  diamond: any;
-  quantity: number;
-}
+import { Diamond, CartItem } from '@/src/types';
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (diamond: any) => void;
+  addToCart: (diamond: Diamond) => void;
   removeFromCart: (diamondId: string) => void;
   updateQuantity: (diamondId: string, quantity: number) => void;
   clearCart: () => void;
@@ -26,7 +23,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('veloura-cart', JSON.stringify(cart));
   }, [cart]);
 
-  const addToCart = (diamond: any) => {
+  const addToCart = (diamond: Diamond) => {
     setCart(prev => {
       const existing = prev.find(item => item.diamond.id === diamond.id);
       if (existing) {

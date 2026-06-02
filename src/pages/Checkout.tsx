@@ -6,9 +6,7 @@ import Button from '@/src/components/ui/Button';
 import { useCart } from '@/src/context/CartContext';
 import { useToast } from '@/src/context/ToastContext';
 import { useAuth } from '@/src/context/AuthContext';
-import { db } from '@/src/lib/firebase';
-import { collection, addDoc, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { fetchApi } from '@/src/lib/api';
 import { OrderStatus } from '@/src/types';
 
 const SHIPPING_OPTIONS = [
@@ -39,61 +37,49 @@ const Checkout = () => {
     
     setIsSubmitting(true);
     try {
-      const orderNumber = `VEL-${Math.floor(100000 + Math.random() * 900000)}`;
-      const orderData = {
-        orderNumber,
-        userId: user?.uid || 'guest',
-        email,
-        phone,
-        status: OrderStatus.CREATED,
+      const payload = {
+        items: cart.map(item => ({ id: item.diamond.id, name: item.diamond.name, price: item.diamond.price, quantity: item.quantity, images: item.diamond.images })),
         totalPrice: subtotal + selectedShipping.cost,
-        shippingAddress: {
+        shipping: {
           fullName,
-          streetAddress,
+          street: streetAddress,
           city,
           state,
           postalCode,
           country
         },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        phone
       };
 
-      const orderRef = await addDoc(collection(db, 'orders'), orderData);
-      
-      // Add items as subcollection
-      const batch = writeBatch(db);
-      for (const item of cart) {
-        const itemRef = doc(collection(db, `orders/${orderRef.id}/items`));
-        batch.set(itemRef, {
-          productId: item.diamond.id,
-          name: item.diamond.name,
-          price: item.diamond.price,
-          quantity: item.quantity,
-          image: item.diamond.images?.[0] || ''
-        });
-      }
-      await batch.commit();
+      const res = await fetchApi('/api/orders', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to create order');
+      const orderData = await res.json();
+      const orderId = orderData.orderId;
+      const orderNumber = orderData.orderNumber;
 
       if (email) {
         try {
           // Fire and forget email
           fetch('/api/send-email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({
               to: email,
-              subject: `Order Confirmation - Vellandi Diamonds #${orderNumber}`,
-              text: `Thank you for your order!\n\nYour order #${orderNumber} has been successfully placed. We will contact you shortly with wire transfer instructions.\n\nTotal: ${formatCurrency(total)}\n\nTrack your order at: ${window.location.origin}/track-order/${orderRef.id}?email=${encodeURIComponent(email)}`,
+              subject: `Order Confirmation - Veloura Diamonds #${orderNumber}`,
+              text: `Thank you for your order!\n\nYour order #${orderNumber} has been successfully placed. We will contact you shortly with wire transfer instructions.\n\nTotal: ${formatCurrency(total)}\n\nTrack your order at: ${window.location.origin}/track-order/${orderId}?email=${encodeURIComponent(email)}`,
               html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A0A; color: #FFFFFF; padding: 40px; border-radius: 8px;">
-                   <h1 style="color: #D4AF37; font-family: Georgia, serif; font-style: italic;">Vellandi Diamonds</h1>
+                   <h1 style="color: #D4AF37; font-family: Georgia, serif; font-style: italic;">Veloura Diamonds</h1>
                    <h2 style="font-size: 18px; margin-bottom: 20px;">Order Confirmation</h2>
                    <p style="color: #EAEAEA; line-height: 1.6;">Thank you for your acquisition. Your order <strong style="font-family: monospace;">#${orderNumber}</strong> has been successfully placed.</p>
                    <p style="color: #EAEAEA; line-height: 1.6;">Please complete your wire transfer to begin processing. You will receive an email from our concierge desk with explicit wire instructions shortly.</p>
                    <h3 style="color: #D4AF37; margin-top: 30px; font-size: 16px;">Acquisition Summary</h3>
                    <p style="color: #A0A0A0;">Total: ${formatCurrency(total)}</p>
-                   <a href="${window.location.origin}/track-order/${orderRef.id}?email=${encodeURIComponent(email)}" style="display: inline-block; margin-top: 30px; padding: 12px 24px; background: #D4AF37; color: #0A0A0A; text-decoration: none; border-radius: 4px; font-weight: bold;">Track Your Order</a>
+                   <a href="${window.location.origin}/track-order/${orderId}?email=${encodeURIComponent(email)}" style="display: inline-block; margin-top: 30px; padding: 12px 24px; background: #D4AF37; color: #0A0A0A; text-decoration: none; border-radius: 4px; font-weight: bold;">Track Your Order</a>
                 </div>
               `
             })
@@ -105,9 +91,9 @@ const Checkout = () => {
 
       showToast("Order placed successfully!", "success");
       clearCart();
-      navigate(`/checkout/wire/${orderRef.id}`);
+      navigate(`/checkout/wire/${orderId}`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'orders');
+      console.error('Order creation error:', error);
       showToast("Failed to place order. Please try again.", "error");
     } finally {
       setIsSubmitting(false);

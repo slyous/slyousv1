@@ -6,9 +6,7 @@ import { TrendingUp, ShoppingBag, Package, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/src/lib/utils';
 import Badge from '@/src/components/ui/Badge';
 import { OrderStatus } from '@/src/types';
-import { db } from '@/src/lib/firebase';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { fetchApi } from '@/src/lib/api';
 
 interface Stats {
   orderCount: number;
@@ -26,20 +24,12 @@ const AdminDashboard = () => {
     const fetchStatsAndOrders = async () => {
       if (!user) return;
       try {
-        const idToken = await user.getIdToken();
-        const res = await fetch('/api/admin/dashboard', {
-          headers: {
-            'Authorization': `Bearer ${idToken}`
-          }
-        });
-        const data = await res.json();
-        setStats(data);
-        
-        // Fetch recent orders
-        const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(10));
-        const snapshot = await getDocs(q);
-        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setOrders(fetchedOrders);
+        const res = await fetchApi('/api/admin/dashboard');
+        if (res.ok) {
+           const data = await res.json();
+           setStats(data);
+           setOrders(data.recentOrders || []);
+        }
       } catch (error) {
         console.error('Error fetching admin stats/orders:', error);
       } finally {
@@ -125,15 +115,15 @@ const AdminDashboard = () => {
                 ) : (
                   orders.map(order => (
                     <tr key={order.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="p-8 font-mono text-ivory">#{order.id.slice(-8).toUpperCase()}</td>
+                      <td className="p-8 font-mono text-ivory">#{order.order_number || order.id.slice(-8).toUpperCase()}</td>
                       <td className="p-8 text-ivory">{order.email}</td>
                       <td className="p-8">
                         <Badge status={order.status as OrderStatus}>{order.status}</Badge>
                       </td>
                       <td className="p-8 text-ivory/60">
-                        {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString() : 'N/A'}
+                        {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td className="p-8 text-bright-gold">{formatCurrency(order.totalPrice || 0)}</td>
+                      <td className="p-8 text-bright-gold">{formatCurrency(order.total_price || 0)}</td>
                       <td className="p-8">
                         <Link to={`/admin/orders`} className="text-xs uppercase tracking-widest text-muted hover:text-white">Manage</Link>
                       </td>

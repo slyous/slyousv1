@@ -2,17 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useAuth } from '@/src/context/AuthContext';
-import { db, auth } from '@/src/lib/firebase';
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ShoppingBag, LogOut, Package, MapPin, Plus, Trash2, Edit2, CheckCircle2 } from 'lucide-react';
-import { signOut } from 'firebase/auth';
+import { fetchApi } from '@/src/lib/api';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import Badge from '@/src/components/ui/Badge';
 import Button from '@/src/components/ui/Button';
 import { OrderStatus, Address } from '@/src/types';
 
 const Account = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') as 'orders' | 'addresses';
   
@@ -30,17 +28,11 @@ const Account = () => {
     const fetchOrders = async () => {
       if (!user) return;
       try {
-        const q = query(
-          collection(db, 'orders'),
-          where('email', '==', user.email)
-        );
-        const snapshot = await getDocs(q);
-        const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => {
-           const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-           const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-           return timeB - timeA;
-        });
-        setOrders(fetchedOrders);
+        const res = await fetchApi('/api/orders');
+        if (res.ok) {
+          const fetchedOrders = await res.json();
+          setOrders(fetchedOrders);
+        }
       } catch (error) {
         console.error('Error fetching orders:', error);
       } finally {
@@ -55,13 +47,11 @@ const Account = () => {
       if (!user || activeTab !== 'addresses') return;
       setFetchingAddresses(true);
       try {
-        const q = query(
-          collection(db, 'addresses'),
-          where('userId', '==', user.uid)
-        );
-        const snapshot = await getDocs(q);
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Address[];
-        setAddresses(fetched);
+        const res = await fetchApi('/api/addresses');
+        if (res.ok) {
+          const fetched = await res.json();
+          setAddresses(fetched);
+        }
       } catch (error) {
         console.error("Error fetching addresses:", error);
       } finally {
@@ -79,16 +69,24 @@ const Account = () => {
     try {
       const addressData = {
         ...currentAddress,
-        userId: user.uid,
-        isDefault: currentAddress.isDefault || addresses.length === 0, 
+        is_default: (currentAddress as any).is_default || addresses.length === 0, 
       };
 
       if (currentAddress.id) {
-        await setDoc(doc(db, 'addresses', currentAddress.id), addressData, { merge: true });
-        setAddresses(prev => prev.map(a => a.id === currentAddress.id ? { ...a, ...addressData } as Address : a));
-      } else {
-        const docRef = await addDoc(collection(db, 'addresses'), { ...addressData, createdAt: serverTimestamp() });
-        setAddresses(prev => [...prev, { ...addressData, id: docRef.id } as Address]);
+        await fetchApi(`/api/addresses/${currentAddress.id}`, { method: 'DELETE' });
+      }
+      
+      const res = await fetchApi('/api/addresses', {
+        method: 'POST',
+        body: JSON.stringify(addressData)
+      });
+      
+      if (res.ok) {
+        // Re-fetch to get correct state
+        const fetchRes = await fetchApi('/api/addresses');
+        if (fetchRes.ok) {
+          setAddresses(await fetchRes.json());
+        }
       }
       
       setIsEditingAddress(false);
@@ -102,7 +100,7 @@ const Account = () => {
 
   const handleDeleteAddress = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'addresses', id));
+      await fetchApi(`/api/addresses/${id}`, { method: 'DELETE' });
       setAddresses(prev => prev.filter(a => a.id !== id));
     } catch (error) {
       console.error("Error deleting address", error);
@@ -111,18 +109,22 @@ const Account = () => {
 
   const handleSetDefault = async (id: string) => {
     try {
-      // First, find the current default and update it to false
-      const currentDefault = addresses.find(a => a.isDefault);
-      if (currentDefault && currentDefault.id) {
-        await setDoc(doc(db, 'addresses', currentDefault.id), { isDefault: false }, { merge: true });
-      }
-      // Set new default to true
-      await setDoc(doc(db, 'addresses', id), { isDefault: true }, { merge: true });
+      const addressToUpdate = addresses.find(a => a.id === id);
+      if (!addressToUpdate) return;
       
-      setAddresses(prev => prev.map(a => ({
-        ...a,
-        isDefault: a.id === id
-      })));
+      // Delete and recreate as default
+      await fetchApi(`/api/addresses/${id}`, { method: 'DELETE' });
+      const res = await fetchApi('/api/addresses', {
+        method: 'POST',
+        body: JSON.stringify({ ...addressToUpdate, is_default: true })
+      });
+      
+      if (res.ok) {
+        const fetchRes = await fetchApi('/api/addresses');
+        if (fetchRes.ok) {
+          setAddresses(await fetchRes.json());
+        }
+      }
     } catch(error) {
       console.error("Error setting default address", error);
     }
@@ -144,14 +146,10 @@ const Account = () => {
               className="bg-graphite/40 border border-white/5 p-8 rounded-section-card backdrop-blur-sm"
             >
               <div className="flex flex-col items-center text-center mb-8">
-                <div className="w-24 h-24 rounded-full border-2 border-dark-gold/30 p-1 mb-4 overflow-hidden">
-                  <img 
-                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=random`} 
-                    alt={user.displayName || 'User'} 
-                    className="w-full h-full rounded-full object-cover"
-                  />
+                <div className="w-24 h-24 rounded-full border-2 border-dark-gold/30 p-1 mb-4 overflow-hidden bg-bright-gold/20 flex items-center justify-center">
+                  <span className="text-4xl font-bold text-bright-gold">{user.name?.charAt(0).toUpperCase() || 'U'}</span>
                 </div>
-                <h2 className="text-xl font-serif text-white">{user.displayName}</h2>
+                <h2 className="text-xl font-serif text-white">{user.name}</h2>
                 <p className="text-sm text-ivory/60 font-sans">{user.email}</p>
               </div>
 
@@ -176,7 +174,7 @@ const Account = () => {
                   <MapPin className="w-4 h-4" />
                   <span>Saved Addresses</span>
                 </button>
-                <button onClick={() => signOut(auth)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-lg text-ivory hover:text-white text-sm transition-colors mt-8">
+                <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-lg text-ivory hover:text-white text-sm transition-colors mt-8">
                   <LogOut className="w-4 h-4 text-muted-text" />
                   <span>Sign Out</span>
                 </button>
@@ -217,14 +215,14 @@ const Account = () => {
                           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 pb-6 border-b border-white/5 gap-4">
                             <div>
                               <p className="text-[10px] uppercase tracking-widest text-muted-text mb-1">
-                                Order #{order.orderNumber || order.id.slice(-8).toUpperCase()}
+                                Order #{order.order_number || order.id.slice(-8).toUpperCase()}
                               </p>
                               <p className="text-ivory font-sans text-sm">
-                                Placed on {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString() : 'Recently'}
+                                Placed on {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'Recently'}
                               </p>
                             </div>
                             <div className="flex items-center gap-4">
-                              <p className="text-bright-gold text-lg">{formatCurrency(order.totalPrice || 0)}</p>
+                              <p className="text-bright-gold text-lg">{formatCurrency(order.total_price || 0)}</p>
                               <Badge status={order.status as OrderStatus}>{order.status}</Badge>
                             </div>
                           </div>
@@ -262,27 +260,27 @@ const Account = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">Full Name</label>
-                               <input required value={currentAddress.fullName || ''} onChange={e => setCurrentAddress({...currentAddress, fullName: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required value={(currentAddress as any).full_name || ''} onChange={e => setCurrentAddress({...currentAddress, full_name: e.target.value} as any)} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">Street Address</label>
-                               <input required value={currentAddress.streetAddress || ''} onChange={e => setCurrentAddress({...currentAddress, streetAddress: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required value={(currentAddress as any).street_address || ''} onChange={e => setCurrentAddress({...currentAddress, street_address: e.target.value} as any)} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">City</label>
-                               <input required placeholder="New York" value={currentAddress.city || ''} onChange={e => setCurrentAddress({...currentAddress, city: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="New York" value={(currentAddress as any).city || ''} onChange={e => setCurrentAddress({...currentAddress, city: e.target.value} as any)} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">State / Province</label>
-                               <input required placeholder="NY" value={currentAddress.state || ''} onChange={e => setCurrentAddress({...currentAddress, state: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="NY" value={(currentAddress as any).state || ''} onChange={e => setCurrentAddress({...currentAddress, state: e.target.value} as any)} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">Postal Code</label>
-                               <input required placeholder="10001" value={currentAddress.postalCode || ''} onChange={e => setCurrentAddress({...currentAddress, postalCode: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="10001" value={(currentAddress as any).postal_code || ''} onChange={e => setCurrentAddress({...currentAddress, postal_code: e.target.value} as any)} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                             <div>
                                <label className="block text-[10px] uppercase tracking-widest text-muted-text mb-2">Country</label>
-                               <input required placeholder="United States of America" value={currentAddress.country || ''} onChange={e => setCurrentAddress({...currentAddress, country: e.target.value})} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
+                               <input required placeholder="United States of America" value={(currentAddress as any).country || ''} onChange={e => setCurrentAddress({...currentAddress, country: e.target.value} as any)} className="w-full bg-void border border-white/10 rounded-lg p-3 text-ivory outline-none focus:border-bright-gold/50 field-focus" />
                             </div>
                           </div>
                           <div className="flex items-center gap-4 pt-4 mt-6 border-t border-white/5">
@@ -308,19 +306,19 @@ const Account = () => {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {addresses.map((addr) => (
-                        <div key={addr.id} className={cn("bg-graphite/20 border rounded-section-card p-6 relative transition-all", addr.isDefault ? "border-bright-gold/50 shadow-sm" : "border-white/5")}>
-                          {addr.isDefault && (
+                        <div key={addr.id} className={cn("bg-graphite/20 border rounded-section-card p-6 relative transition-all", (addr as any).is_default ? "border-bright-gold/50 shadow-sm" : "border-white/5")}>
+                          {(addr as any).is_default && (
                              <div className="absolute top-4 right-4 flex items-center gap-1 text-bright-gold text-xs font-mono uppercase tracking-widest">
                                 <CheckCircle2 className="w-4 h-4" />
                                 <span>Default</span>
                              </div>
                           )}
                           <div className="mb-4 pr-16">
-                            <p className="text-ivory font-serif text-lg mb-1">{addr.fullName}</p>
+                            <p className="text-ivory font-serif text-lg mb-1">{(addr as any).full_name}</p>
                             <p className="text-ivory/70 text-sm font-sans leading-relaxed">
-                              {addr.streetAddress}<br />
-                              {addr.city}, {addr.state} {addr.postalCode}<br />
-                              {addr.country}
+                              {(addr as any).street_address}<br />
+                              {(addr as any).city}, {(addr as any).state} {(addr as any).postal_code}<br />
+                              {(addr as any).country}
                             </p>
                           </div>
                           <div className="flex gap-4 border-t border-white/5 pt-4">
@@ -330,7 +328,7 @@ const Account = () => {
                             <button onClick={() => handleDeleteAddress(addr.id!)} className="text-xs uppercase tracking-widest text-crimson/70 hover:text-crimson flex items-center gap-1 transition-colors">
                                <Trash2 className="w-3 h-3" /> Delete
                             </button>
-                            {!addr.isDefault && (
+                            {!(addr as any).is_default && (
                                <button onClick={() => handleSetDefault(addr.id!)} className="text-xs uppercase tracking-widest text-bright-gold/70 hover:text-bright-gold flex items-center gap-1 ml-auto transition-colors">
                                   Set Default
                                </button>

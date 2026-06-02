@@ -22,10 +22,8 @@ import { useWishlist } from '@/src/context/WishlistContext';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCart } from '@/src/context/CartContext';
 import { useToast } from '@/src/context/ToastContext';
-import { db, signInWithGoogle } from '@/src/lib/firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, where, limit } from 'firebase/firestore';
+import { fetchApi } from '@/src/lib/api';
 import { Review, CertificationLab } from '@/src/types';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
 import CertificationInfo from '@/src/components/CertificationInfo';
 
 const ProductDetail = () => {
@@ -45,22 +43,20 @@ const ProductDetail = () => {
     const fetchDiamond = async () => {
       setLoadingProduct(true);
       try {
-        const q = query(collection(db, 'products'), where('slug', '==', slug), limit(1));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const raw = snapshot.docs[0].data() as any;
-          const dData = {
-            id: snapshot.docs[0].id,
-            ...raw,
-            certification: raw.certification || { lab: raw.certLab || 'GIA', number: raw.certNumber || 'N/A' }
-          };
-          setDiamond(dData);
-          setActiveImage(dData.images?.[0] || '');
+        const res = await fetchApi(`/api/products/${slug}`);
+        if (res.ok) {
+            const raw = await res.json();
+            const dData = {
+                ...raw,
+                certification: { lab: raw.cert_lab || 'GIA', number: raw.cert_number || 'N/A', url: raw.cert_url }
+            };
+            setDiamond(dData);
+            setActiveImage(dData.images?.[0] || '');
         } else {
-          setDiamond(null);
+            setDiamond(null);
         }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'products');
+        console.error("Failed to fetch product", error);
         setDiamond(null);
       } finally {
         setLoadingProduct(false);
@@ -85,22 +81,18 @@ const ProductDetail = () => {
   useEffect(() => {
     if (!diamond?.id) return;
     
-    // In actual production, product ID from the route/db should be used.
-    // Ensure we are subscribing to valid reviews collection path.
-    const path = `products/${diamond.id}/reviews`;
-    const q = query(collection(db, path), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedReviews = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Review[];
-      setReviews(fetchedReviews);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
-    });
-
-    return () => unsubscribe();
+    const fetchReviews = async () => {
+        try {
+            const res = await fetchApi(`/api/products/${diamond.id}/reviews`);
+            if (res.ok) {
+                const fetchedReviews = await res.json();
+                setReviews(fetchedReviews);
+            }
+        } catch (error) {
+            console.error("Failed to fetch reviews", error);
+        }
+    };
+    fetchReviews();
   }, [diamond?.id]);
 
   const submitReview = async (e: React.FormEvent) => {
@@ -110,20 +102,25 @@ const ProductDetail = () => {
     if (!diamond?.id) return;
     
     setIsSubmitting(true);
-    const path = `products/${diamond.id}/reviews`;
     
     try {
-      await addDoc(collection(db, path), {
-        userId: user.uid,
-        authorName: user.displayName || 'Anonymous',
-        rating,
-        comment,
-        createdAt: serverTimestamp(),
+      const res = await fetchApi(`/api/products/${diamond.id}/reviews`, {
+          method: 'POST',
+          body: JSON.stringify({ rating, comment })
       });
-      setComment('');
-      setRating(5);
+
+      if (res.ok) {
+          const newReview = await res.json();
+          setReviews([newReview, ...reviews]);
+          setComment('');
+          setRating(5);
+          showToast('Review submitted successfully', 'success');
+      } else {
+          showToast('Failed to submit review', 'error');
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      console.error("Failed to submit review", error);
+      showToast('A network error occurred', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -228,13 +225,13 @@ const ProductDetail = () => {
                 </div>
               </div>
               <div className="absolute top-6 left-6 pointer-events-none z-20">
-                 {diamond.isNew && <Badge variant="ivory" className="px-4 py-1.5 shadow-xl">New Arrival</Badge>}
+                 {diamond.is_new && <Badge variant="ivory" className="px-4 py-1.5 shadow-xl">New Arrival</Badge>}
               </div>
             </div>
 
             {/* Thumbnails */}
             <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 gap-4">
-              {diamond.images?.map((img, idx) => (
+              {diamond.images?.map((img: string, idx: number) => (
                 <button 
                   key={idx}
                   onClick={() => setActiveImage(img)}
@@ -266,22 +263,22 @@ const ProductDetail = () => {
                 <span className="text-4xl md:text-5xl font-sans font-medium text-bright-gold">
                   {formatCurrency(diamond.price)}
                 </span>
-                {diamond.marketPrice && (
+                {diamond.market_price && (
                   <div className="flex flex-col">
                     <span className="text-[10px] items-center gap-1.5 uppercase tracking-widest text-muted-text flex">
                       <TrendingUp className="w-3 h-3 text-bright-gold" />
                       Est. Market Value
                     </span>
                     <span className="text-xl text-muted-text font-mono">
-                      {formatCurrency(diamond.marketPrice)}
+                      {formatCurrency(diamond.market_price)}
                     </span>
                   </div>
                 )}
-                {diamond.originalPrice && (
+                {diamond.original_price && (
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase tracking-widest text-muted-text">Original Price</span>
                     <span className="text-xl text-muted-text line-through font-mono">
-                      {formatCurrency(diamond.originalPrice)}
+                      {formatCurrency(diamond.original_price)}
                     </span>
                   </div>
                 )}
@@ -474,9 +471,9 @@ const ProductDetail = () => {
             <div className="bg-graphite/20 border border-white/5 p-8 rounded-section-card mb-16 text-center backdrop-blur-md">
               <Star className="w-8 h-8 text-dark-gold mx-auto mb-4" />
               <p className="text-ivory/60 mb-6">Please sign in to share your experience with this beautiful piece.</p>
-              <Button onClick={signInWithGoogle} variant="outline" className="px-8 border-white/10 hover:border-white/30">
+              <Link to="/login" className="px-8 py-2 border border-white/10 hover:border-white/30 rounded inline-block text-white">
                 Sign In to Review
-              </Button>
+              </Link>
             </div>
           )}
 
@@ -495,7 +492,7 @@ const ProductDetail = () => {
                       <div>
                         <p className="text-ivory font-medium font-sans text-sm">{review.authorName}</p>
                         <p className="text-[10px] uppercase tracking-widest text-muted-text font-mono mt-0.5">
-                          {review.createdAt ? new Date(review.createdAt.toMillis ? review.createdAt.toMillis() : review.createdAt).toLocaleDateString() : 'Just now'}
+                          {review.created_at ? new Date(review.created_at).toLocaleDateString() : 'Just now'}
                         </p>
                       </div>
                     </div>

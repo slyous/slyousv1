@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, ChevronDown, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '@/src/lib/firebase';
-import { collection, query, getDocs, where, limit } from 'firebase/firestore';
+import { fetchApi } from '@/src/lib/api';
 import ProductCard from '@/src/components/ui/ProductCard';
 import Badge from '@/src/components/ui/Badge';
 import Button from '@/src/components/ui/Button';
 import { cn } from '@/src/lib/utils';
 import { DiamondShape } from '@/src/types';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
 
 const DiamondCollection = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -25,13 +23,13 @@ const DiamondCollection = () => {
     const fetchDiamonds = async () => {
       setLoading(true);
       try {
-        // Fetching all products first (in a real app we'd filter on server-side more aggressively)
-        const q = query(collection(db, 'products'));
-        const snapshot = await getDocs(q);
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setDiamonds(fetched);
+        const res = await fetchApi('/api/products');
+        if (res.ok) {
+            const fetched = await res.json();
+            setDiamonds(fetched);
+        }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'products');
+        console.error("Failed to fetch products", error);
       } finally {
         setLoading(false);
       }
@@ -72,7 +70,7 @@ const DiamondCollection = () => {
     .filter(d => {
       const matchesSearch = d.name?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesShape = selectedShapes.length === 0 || selectedShapes.includes(d.shape);
-      const matchesLab = selectedLabs.length === 0 || selectedLabs.includes(d.certification?.lab);
+      const matchesLab = selectedLabs.length === 0 || selectedLabs.includes(d.cert_lab);
       return matchesSearch && matchesShape && matchesLab;
     })
     .sort((a, b) => {

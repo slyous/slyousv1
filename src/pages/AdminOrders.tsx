@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/src/context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
-import { db } from '@/src/lib/firebase';
-import { collection, query, orderBy, getDocs, doc, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { fetchApi } from '@/src/lib/api';
 import { formatCurrency } from '@/src/lib/utils';
 import Badge from '@/src/components/ui/Badge';
 import { OrderStatus } from '@/src/types';
@@ -20,12 +18,14 @@ const AdminOrders = () => {
   const fetchOrders = async () => {
     setFetching(true);
     try {
-      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const fetchedOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setOrders(fetchedOrders);
+      const res = await fetchApi('/api/admin/orders');
+      if (res.ok) {
+        setOrders(await res.json());
+      } else {
+        showToast('Failed to fetch orders', 'error');
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'orders');
+      console.error(error);
       showToast('Failed to fetch orders', 'error');
     } finally {
       setFetching(false);
@@ -41,17 +41,7 @@ const AdminOrders = () => {
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus, customMessage?: string) => {
     try {
       const order = orders.find(o => o.id === orderId);
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: newStatus,
-        updatedAt: serverTimestamp()
-      });
-
-      // Add to timeline updates
-      const updateData: any = {
-        status: newStatus,
-        createdAt: serverTimestamp()
-      };
-
+      
       let message = customMessage;
       if (!message) {
         if (newStatus === OrderStatus.PROCESSING) message = 'Your order is currently being packaged and prepared.';
@@ -60,9 +50,13 @@ const AdminOrders = () => {
         else if (newStatus === OrderStatus.OUT_FOR_DELIVERY) message = 'Your package is out for delivery. An email notification has been sent.';
         else if (newStatus === OrderStatus.DELIVERED) message = 'Your package has been delivered.';
       }
-      if (message) updateData.message = message;
 
-      await addDoc(collection(db, `orders/${orderId}/updates`), updateData);
+      const res = await fetchApi(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus, message })
+      });
+
+      if (!res.ok) throw new Error('Failed to update status');
 
       // Send Email Notification
       if (order?.email && message) {
@@ -70,10 +64,10 @@ const AdminOrders = () => {
           // Fire and forget email
           fetch('/api/send-email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: JSON.stringify({
               to: order.email,
-              subject: `Update on your Vellandi Order #${order.orderNumber || orderId.slice(-8).toUpperCase()}`,
+               subject: `Update on your Vellandi Order #${order.order_number || orderId.slice(-8).toUpperCase()}`,
               text: `Order Status: ${newStatus}\n\n${message}\n\nTrack your order at: ${window.location.origin}/track-order/${orderId}?email=${encodeURIComponent(order.email)}`,
               html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #0A0A0A; color: #FFFFFF; padding: 40px; border-radius: 8px;">
@@ -82,9 +76,9 @@ const AdminOrders = () => {
                    <p style="color: #EAEAEA; line-height: 1.6; margin-bottom: 20px;">${message}</p>
                    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 6px; margin-bottom: 20px;">
                      <h3 style="color: #A0A0A0; font-size: 14px; margin-top: 0;">Order Details</h3>
-                     <p style="margin: 5px 0; font-family: monospace;">Order #: ${order.orderNumber || orderId.slice(-8).toUpperCase()}</p>
-                     <p style="margin: 5px 0;">Total Amount: ${formatCurrency(order.totalPrice || order.total || 0)}</p>
-                     <p style="margin: 5px 0; color: #A0A0A0; font-size: 14px;">Shipping Address: ${order.shippingAddress?.streetAddress || ''}, ${order.shippingAddress?.city || ''}</p>
+                     <p style="margin: 5px 0; font-family: monospace;">Order #: ${order.order_number || orderId.slice(-8).toUpperCase()}</p>
+                     <p style="margin: 5px 0;">Total Amount: ${formatCurrency(order.total_price || order.total || 0)}</p>
+                     <p style="margin: 5px 0; color: #A0A0A0; font-size: 14px;">Shipping Address: ${order.shipping_street || ''}, ${order.shipping_city || ''}</p>
                    </div>
                    <a href="${window.location.origin}/track-order/${orderId}?email=${encodeURIComponent(order.email)}" style="display: inline-block; margin-top: 10px; padding: 12px 24px; background: #D4AF37; color: #0A0A0A; text-decoration: none; border-radius: 4px; font-weight: bold;">Track Your Order</a>
                 </div>
@@ -104,7 +98,7 @@ const AdminOrders = () => {
       // Optimistic update
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `orders/${orderId}`);
+      console.error(error);
       showToast('Failed to update status', 'error');
     }
   };
@@ -169,19 +163,19 @@ const AdminOrders = () => {
                     <tr key={order.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                       <td className="p-8">
                         <div className="flex flex-col">
-                           <span className="font-mono text-ivory">#{order.orderNumber || order.id.slice(-8).toUpperCase()}</span>
+                           <span className="font-mono text-ivory">#{order.order_number || order.id.slice(-8).toUpperCase()}</span>
                            <span className="text-[10px] text-muted-text font-mono mt-1">
-                             {order.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleString() : 'N/A'}
+                             {order.created_at ? new Date(order.created_at).toLocaleString() : 'N/A'}
                            </span>
                         </div>
                       </td>
                       <td className="p-8">
                         <div className="flex flex-col">
-                           <span className="text-white">{order.shippingAddress?.fullName}</span>
+                           <span className="text-white">{order.shipping_fullname}</span>
                            <span className="text-xs text-muted-text mt-1">{order.email}</span>
                         </div>
                       </td>
-                      <td className="p-8 font-mono text-bright-gold text-base">{formatCurrency(order.totalPrice || 0)}</td>
+                      <td className="p-8 font-mono text-bright-gold text-base">{formatCurrency(order.total_price || 0)}</td>
                       <td className="p-8">
                         <Badge status={order.status as OrderStatus}>{order.status}</Badge>
                       </td>
