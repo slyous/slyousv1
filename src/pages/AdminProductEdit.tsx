@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
-import { db } from '@/src/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, doc as createDocRef } from 'firebase/firestore';
 import { ArrowLeft, Save } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { fetchApi } from '@/src/lib/api';
 import Button from '@/src/components/ui/Button';
 
 // Utility to generate a slug from name
@@ -42,30 +40,29 @@ const AdminProductEdit = () => {
     const fetchProduct = async () => {
       if (isNew || !id) return;
       try {
-        const docRef = doc(db, 'products', id);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const data = snap.data();
+        const res = await fetchApi(`/api/products/${id}`);
+        if (res.ok) {
+          const data = await res.json();
           setFormData({
             name: data.name || '',
             slug: data.slug || '',
             price: data.price || 0,
-            marketPrice: data.marketPrice || 0,
+            marketPrice: data.market_price || 0,
             carat: data.carat || 0,
             cut: data.cut || 'Excellent',
             clarity: data.clarity || 'VVS1',
             color: data.color || 'D',
             shape: data.shape || 'Round',
             description: data.description || '',
-            certificationUrl: data.certificationUrl || '',
-            certNumber: data.certNumber || '',
-            certLab: data.certLab || 'GIA',
-            inStock: data.inStock ?? true,
+            certificationUrl: data.cert_url || '',
+            certNumber: data.cert_number || '',
+            certLab: data.cert_lab || 'GIA',
+            inStock: data.in_stock === 1 || data.in_stock === true,
             imagesText: (data.images || []).join('\n')
           });
         }
       } catch (err) {
-        handleFirestoreError(err, OperationType.GET, `products/${id}`);
+        console.error(err);
       } finally {
         setFetching(false);
       }
@@ -114,38 +111,39 @@ const AdminProductEdit = () => {
       name: formData.name,
       slug: formData.slug,
       price: formData.price,
-      marketPrice: formData.marketPrice || 0,
+      market_price: formData.marketPrice || 0,
       carat: formData.carat,
       cut: formData.cut,
       clarity: formData.clarity,
       color: formData.color,
       shape: formData.shape,
       description: formData.description,
-      certificationUrl: formData.certificationUrl,
-      certNumber: formData.certNumber,
-      certLab: formData.certLab,
-      inStock: formData.inStock,
-      images: imagesArray,
-      createdAt: serverTimestamp() // Firestore rules mandate request.time for createdAt (this will be ignored on update if not modified according to 'Immortal Field' rule, but we just set it here)
+      cert_url: formData.certificationUrl,
+      cert_number: formData.certNumber,
+      cert_lab: formData.certLab,
+      in_stock: formData.inStock ? 1 : 0,
+      images: imagesArray
     };
 
     try {
       if (isNew) {
-        // Create new
-        const newRef = createDocRef(collection(db, 'products'));
-        await setDoc(newRef, productData);
+        const res = await fetchApi('/api/products', {
+          method: 'POST',
+          body: JSON.stringify(productData)
+        });
+        if (!res.ok) throw new Error('Failed to create product');
         navigate('/admin/products');
       } else {
-        // Update existing - only omitting createdAt to avoid modifying immortal field if we had strict tests, but rules say data.createdAt == request.time on create. Wait, let's omit createdAt on update to be safe.
-        const { createdAt, ...updateData } = productData;
-        const targetRef = doc(db, 'products', id!);
-        await updateDoc(targetRef, updateData);
+        const res = await fetchApi(`/api/products/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(productData)
+        });
+        if (!res.ok) throw new Error('Failed to update product');
         navigate('/admin/products');
       }
     } catch (err: any) {
       setError(err.message || String(err));
       console.error(err);
-      handleFirestoreError(err, isNew ? OperationType.CREATE : OperationType.UPDATE, isNew ? 'products' : `products/${id}`);
     } finally {
       setSaving(false);
     }

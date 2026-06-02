@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
-import { ArrowRight, MessageCircle, ShieldCheck, Truck, Scale, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, MessageCircle, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ProductCard from '@/src/components/ui/ProductCard';
 import { cn } from '@/src/lib/utils';
-import { db } from '@/src/lib/firebase';
-import { collection, query, limit, getDocs } from 'firebase/firestore';
+import { fetchApi } from '@/src/lib/api';
 
 const Home = () => {
   const [diamonds, setDiamonds] = useState<any[]>([]);
@@ -14,10 +13,11 @@ const Home = () => {
   useEffect(() => {
     const fetchFeatured = async () => {
       try {
-        const q = query(collection(db, 'products'), limit(5));
-        const snapshot = await getDocs(q);
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setDiamonds(fetched);
+        const res = await fetchApi('/api/products?limit=5');
+        if (res.ok) {
+            const fetched = await res.json();
+            setDiamonds(fetched);
+        }
       } catch (error) {
         console.error("Error fetching featured diamonds:", error);
       } finally {
@@ -109,7 +109,7 @@ const Home = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="text-6xl md:text-8xl font-serif text-white mb-10 leading-none leading-tight"
+            className="text-6xl md:text-8xl font-serif text-white mb-10 leading-tight"
           >
             Precision in <br /> 
             <span className="italic">Every Facet</span>
@@ -124,19 +124,6 @@ const Home = () => {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </motion.div>
-        </div>
-
-        {/* Hero Navigation Controls */}
-        <div className="absolute bottom-12 right-12 flex gap-4 items-center z-40">
-          <span className="font-mono text-xs text-muted tracking-tighter">01 / 03</span>
-          <div className="flex gap-2">
-            <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
-              <ChevronLeft className="w-4 h-4 text-white" />
-            </button>
-            <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors">
-              <ChevronRight className="w-4 h-4 text-white" />
-            </button>
-          </div>
         </div>
       </section>
 
@@ -217,11 +204,6 @@ const Home = () => {
           </div>
         </div>
       </section>
-
-      {/* WhatsApp Floating Button */}
-      <button className="fixed bottom-10 right-10 z-[100] w-14 h-14 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all outline-none">
-        <MessageCircle className="w-7 h-7" />
-      </button>
     </div>
   );
 };

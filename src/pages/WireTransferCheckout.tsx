@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db } from '@/src/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Order, OrderStatus } from '@/src/types';
 import { useToast } from '@/src/context/ToastContext';
 import { formatCurrency } from '@/src/lib/utils';
 import Button from '@/src/components/ui/Button';
 import { motion } from 'framer-motion';
 import { Copy, CheckCircle2, AlertCircle } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { fetchApi } from '@/src/lib/api';
 
 const WireTransferCheckout = () => {
   const { id } = useParams();
@@ -22,26 +20,27 @@ const WireTransferCheckout = () => {
   // Fallback to provided details since import.meta.env might not be populated by the user
   const env = (import.meta as any).env;
   const bankDetails = {
-    bank: env.VITE_WIRE_BANK_NAME || "Discover Bank",
-    routing: env.VITE_WIRE_ROUTING_NUMBER || "031100649",
-    account: env.VITE_WIRE_ACCOUNT_NUMBER || "7065995885",
-    name: env.VITE_WIRE_ACCOUNT_NAME || "Montrel Outley",
+    bank: env.VITE_WIRE_BANK_NAME || "Swiss Bank Corporation",
+    routing: env.VITE_WIRE_ROUTING_NUMBER || "000000000",
+    account: env.VITE_WIRE_ACCOUNT_NUMBER || "0000000000",
+    name: env.VITE_WIRE_ACCOUNT_NAME || "Vellandi Diamonds LLC",
   };
 
   useEffect(() => {
     const fetchOrder = async () => {
       if (!id) return;
       try {
-        const docRef = doc(db, 'orders', id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setOrder({ id: docSnap.id, ...docSnap.data() } as Order);
+        const res = await fetchApi(`/api/orders/${id}`);
+        if (res.ok) {
+          const fetched = await res.json();
+          setOrder(fetched);
         } else {
           showToast("Order not found.", "error");
           navigate('/');
         }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `orders/${id}`);
+        console.error("Failed to fetch order", error);
+        showToast("Network error.", "error");
       } finally {
         setLoading(false);
       }
@@ -53,14 +52,16 @@ const WireTransferCheckout = () => {
     if (!id || !order) return;
     setConfirming(true);
     try {
-      await updateDoc(doc(db, 'orders', id), {
-        status: OrderStatus.PENDING_CONFIRMATION,
+      const res = await fetchApi(`/api/orders/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: OrderStatus.PENDING_CONFIRMATION })
       });
+      if (!res.ok) throw new Error('Failed to update order');
       showToast("Payment confirmation recorded", "success");
       // @ts-ignore
-      navigate('/order-confirmation', { state: { orderId: id, orderNumber: order.orderNumber, wirePending: true } });
+      navigate('/order-confirmation', { state: { orderId: id, orderNumber: order.order_number, wirePending: true } });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `orders/${id}`);
+      console.error("Failed to update order", error);
       showToast("Failed to update order", "error");
     } finally {
       setConfirming(false);
@@ -152,7 +153,7 @@ const WireTransferCheckout = () => {
             <div className="bg-bright-gold/5 border border-bright-gold/20 rounded-card p-6">
               <h3 className="text-[10px] font-mono tracking-widest text-bright-gold uppercase mb-2">Important Payment Memo</h3>
               {/* @ts-ignore */}
-              <p className="text-white text-sm">Please include <span className="font-mono text-bright-gold font-bold">{order.orderNumber || order.id.slice(-8).toUpperCase()}</span> in your transfer memo for rapid verification.</p>
+              <p className="text-white text-sm">Please include <span className="font-mono text-bright-gold font-bold">{(order as any).order_number || order.id.slice(-8).toUpperCase()}</span> in your transfer memo for rapid verification.</p>
             </div>
             
             <Button 
@@ -175,10 +176,10 @@ const WireTransferCheckout = () => {
                   <span className="text-xs text-muted-text uppercase font-mono tracking-widest">Order Ref</span>
                   <div className="flex items-center gap-2">
                     {/* @ts-ignore */}
-                    <span className="text-white font-mono text-lg">{order.orderNumber || order.id.slice(-8).toUpperCase()}</span>
+                    <span className="text-white font-mono text-lg">{(order as any).order_number || order.id.slice(-8).toUpperCase()}</span>
                     <button 
                       // @ts-ignore
-                      onClick={() => copyToClipboard(order.orderNumber || order.id.slice(-8).toUpperCase(), 'ref')} 
+                      onClick={() => copyToClipboard((order as any).order_number || order.id.slice(-8).toUpperCase(), 'ref')} 
                       className="p-1.5 text-muted-text hover:text-bright-gold bg-white/5 hover:bg-white/10 rounded-md transition-all"
                     >
                       {copiedField === 'ref' ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -188,15 +189,15 @@ const WireTransferCheckout = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-muted-text uppercase font-mono tracking-widest">Total Amount</span>
                   {/* @ts-ignore */}
-                  <span className="text-bright-gold font-mono text-lg">{formatCurrency(order.totalPrice)}</span>
+                  <span className="text-bright-gold font-mono text-lg">{formatCurrency((order as any).total_price)}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <p className="text-[10px] text-ivory/40 uppercase tracking-widest font-mono text-center">Billed To</p>
                 <div className="text-center">
-                  <p className="text-sm text-ivory">{order.shippingAddress?.fullName}</p>
-                  <p className="text-[10px] text-muted-text mt-1">{order.shippingAddress?.email || (order as any).email}</p>
+                  <p className="text-sm text-ivory">{(order as any).shipping_fullname}</p>
+                  <p className="text-[10px] text-muted-text mt-1">{(order as any).email}</p>
                 </div>
               </div>
             </div>

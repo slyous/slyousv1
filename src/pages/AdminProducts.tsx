@@ -2,11 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useAuth } from '@/src/context/AuthContext';
-import { db } from '@/src/lib/firebase';
-import { collection, query, orderBy, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/src/lib/utils';
-import { handleFirestoreError, OperationType } from '@/src/lib/firestoreError';
+import { fetchApi } from '@/src/lib/api';
 
 const AdminProducts = () => {
   const { isAdmin, loading } = useAuth();
@@ -16,12 +14,12 @@ const AdminProducts = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setProducts(fetchedProducts);
+        const res = await fetchApi('/api/products');
+        if (res.ok) {
+          setProducts(await res.json());
+        }
       } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'products');
+        console.error(error);
       } finally {
         setFetching(false);
       }
@@ -35,10 +33,10 @@ const AdminProducts = () => {
   const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
-      await deleteDoc(doc(db, 'products', id));
+      await fetchApi(`/api/products/${id}`, { method: 'DELETE' });
       setProducts(prev => prev.filter(p => p.id !== id));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+      console.error(error);
     }
   };
 
@@ -102,7 +100,7 @@ const AdminProducts = () => {
                       </td>
                       <td className="p-6 text-bright-gold font-medium">{formatCurrency(product.price || 0)}</td>
                       <td className="p-6">
-                        {product.inStock ? (
+                        {product.in_stock ? (
                           <span className="text-success text-xs font-mono uppercase">In Stock</span>
                         ) : (
                           <span className="text-crimson/80 text-xs font-mono uppercase">Out of Stock</span>

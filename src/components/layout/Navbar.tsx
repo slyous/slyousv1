@@ -7,8 +7,6 @@ import Button from '../ui/Button';
 import { useWishlist } from '@/src/context/WishlistContext';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCart } from '@/src/context/CartContext';
-import { signInWithGoogle, auth } from '@/src/lib/firebase';
-import { signOut } from 'firebase/auth';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -17,7 +15,7 @@ const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { wishlist } = useWishlist();
   const { cart } = useCart();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -113,14 +111,14 @@ const Navbar = () => {
             </Link>
             {user ? (
               <div className="relative group/user">
-                <button className="w-8 h-8 rounded-full border border-dark-gold/30 overflow-hidden hover:border-bright-gold transition-colors block cursor-pointer">
-                  <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=random`} alt={user.displayName || 'Profile'} className="w-full h-full object-cover" />
+                <button className="w-8 h-8 rounded-full border border-dark-gold/30 overflow-hidden hover:border-bright-gold transition-colors block cursor-pointer bg-bright-gold/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-bright-gold">{user.name?.charAt(0).toUpperCase() || 'U'}</span>
                 </button>
                 
                 {/* User Dropdown */}
                 <div className="absolute right-0 top-full mt-2 w-56 bg-graphite border border-white/10 rounded-card shadow-2xl py-2 opacity-0 invisible group-hover/user:opacity-100 group-hover/user:visible transition-all z-50 animate-in fade-in slide-in-from-top-2">
                   <div className="px-4 py-3 border-b border-white/5 mb-2">
-                    <p className="text-xs text-white font-medium truncate">{user.displayName || 'Guest'}</p>
+                    <p className="text-xs text-white font-medium truncate">{user.name || 'Guest'}</p>
                     <p className="text-[10px] text-muted-text truncate">{user.email}</p>
                   </div>
                   <Link to="/account" className="flex items-center gap-3 px-4 py-2 text-ivory hover:text-white hover:bg-white/5 transition-colors">
@@ -131,7 +129,7 @@ const Navbar = () => {
                     <ShoppingBag className="w-4 h-4" />
                     <span className="text-sm">Order History</span>
                   </Link>
-                  <button onClick={() => signOut(auth)} className="w-full flex items-center gap-3 px-4 py-2 text-crimson hover:bg-crimson/10 transition-colors border-t border-white/5 mt-2 text-left">
+                  <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2 text-crimson hover:bg-crimson/10 transition-colors border-t border-white/5 mt-2 text-left">
                     <LogOut className="w-4 h-4" />
                     <span className="text-sm">Sign Out</span>
                   </button>
@@ -218,8 +216,8 @@ const Navbar = () => {
                 )}
               </Link>
               {user ? (
-                <Link to="/account" onClick={() => setMobileMenuOpen(false)} className="relative w-6 h-6 rounded-full border border-dark-gold/30 overflow-hidden block">
-                  <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=random`} alt={user.displayName || 'Profile'} className="w-full h-full object-cover" />
+                <Link to="/account" onClick={() => setMobileMenuOpen(false)} className="relative w-6 h-6 rounded-full border border-dark-gold/30 overflow-hidden flex items-center justify-center bg-bright-gold/20">
+                  <span className="text-[10px] font-bold text-bright-gold">{user.name?.charAt(0).toUpperCase() || 'U'}</span>
                 </Link>
               ) : (
                 <Link to="/login" onClick={() => setMobileMenuOpen(false)}>

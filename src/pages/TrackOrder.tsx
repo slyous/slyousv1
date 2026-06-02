@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { db } from '@/src/lib/firebase';
-import { doc, getDoc, collection, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { fetchApi } from '@/src/lib/api';
 import { Package, Truck, CheckCircle, Clock, MapPin, AlertCircle } from 'lucide-react';
 import { OrderStatus, OrderUpdate } from '@/src/types';
 import Badge from '@/src/components/ui/Badge';
@@ -41,45 +40,16 @@ const TrackOrder = () => {
     setLoading(true);
     setError('');
     try {
-      let orderData: any = null;
-      let orderId: string = '';
-
-      // Try direct ID fetch first
-      const orderRef = doc(db, 'orders', idOrNumber);
-      const snap = await getDoc(orderRef);
-      
-      if (snap.exists()) {
-        orderData = snap.data();
-        orderId = snap.id;
-      } else {
-        // Try searching by orderNumber
-        let q;
-        if (emailStr) {
-          q = query(
-            collection(db, 'orders'),
-            where('orderNumber', '==', idOrNumber.trim().toUpperCase()),
-            where('email', '==', emailStr.trim().toLowerCase())
-          );
-        } else {
-          q = query(
-            collection(db, 'orders'),
-            where('orderNumber', '==', idOrNumber.trim().toUpperCase())
-          );
-        }
-        const querySnap = await getDocs(q);
-        if (!querySnap.empty) {
-          const doc = querySnap.docs[0];
-          orderData = doc.data();
-          orderId = doc.id;
-        }
-      }
-      
-      if (!orderData) {
-        setError('Order not found. Please check your order details.');
+      const res = await fetchApi(`/api/orders/${idOrNumber}`);
+      if (!res.ok) {
+        if (res.status === 404) setError('Order not found. Please check your order details.');
+        else setError('Failed to retrieve order status.');
         setOrder(null);
         setLoading(false);
         return;
       }
+      
+      const orderData = await res.json();
       
       // If email is provided, verify it (public verification layer)
       if (emailStr && orderData.email.toLowerCase().trim() !== emailStr.toLowerCase().trim()) {
@@ -89,26 +59,11 @@ const TrackOrder = () => {
         return;
       }
 
-      setOrder({ id: orderId, ...orderData });
-
-      // Fetch tracking updates
-      const updatesRef = collection(db, 'orders', orderId, 'updates');
-      const q = query(updatesRef, orderBy('createdAt', 'desc'));
-      const updatesSnap = await getDocs(q);
-      
-      const updatesData = updatesSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as OrderUpdate[];
-      
-      setUpdates(updatesData);
+      setOrder(orderData);
+      setUpdates(orderData.updates || []);
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'permission-denied') {
-        setError('You do not have permission to view this order. If you are not logged in, please provide the email used for the order.');
-      } else {
-        setError('Failed to retrieve order status.');
-      }
+      setError('Failed to retrieve order status.');
     } finally {
       setLoading(false);
     }
@@ -190,10 +145,10 @@ const TrackOrder = () => {
                   ← Track Another Order
                 </Link>
                 <h1 className="text-3xl font-serif text-white flex items-center gap-4">
-                  Order <span className="font-mono text-bright-gold text-2xl tracking-tight">#{order?.orderNumber || order?.id?.slice(-8).toUpperCase()}</span>
+                  Order <span className="font-mono text-bright-gold text-2xl tracking-tight">#{order?.order_number || order?.id?.slice(-8).toUpperCase()}</span>
                 </h1>
                 <p className="text-ivory/60 mt-2 font-sans">
-                  Placed on {order?.createdAt?.toMillis ? new Date(order.createdAt.toMillis()).toLocaleDateString() : 'N/A'}
+                  Placed on {order?.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
               <div className="text-right">
@@ -218,7 +173,7 @@ const TrackOrder = () => {
                       <div className="absolute left-6 top-10 bottom-10 w-px bg-white/10 z-0"></div>
                       
                       <div className="space-y-8 relative z-10">
-                        {(updates.length > 0 ? updates : [{ id: 'init', status: order?.status || OrderStatus.CREATED, createdAt: order?.createdAt, message: 'Order has been placed.' }]).map((update: any, idx: number) => (
+                        {(updates.length > 0 ? updates : [{ id: 'init', status: order?.status || OrderStatus.CREATED, created_at: order?.created_at, message: 'Order has been placed.' }]).map((update: any, idx: number) => (
                           <motion.div 
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
@@ -235,7 +190,7 @@ const TrackOrder = () => {
                                   {update.status}
                                 </h4>
                                 <span className="text-xs text-muted-text font-mono">
-                                  {update.createdAt?.toMillis ? new Date(update.createdAt.toMillis()).toLocaleString() : ''}
+                                  {update.created_at ? new Date(update.created_at).toLocaleString() : ''}
                                 </span>
                               </div>
                               {update.message && (
@@ -255,21 +210,21 @@ const TrackOrder = () => {
                 <div className="bg-graphite/20 border border-white/5 rounded-section-card p-6">
                   <h3 className="text-[10px] uppercase tracking-widest text-muted-text mb-6">Delivery Details</h3>
                   
-                  {order?.trackingNumber && (
+                  {order?.tracking_number && (
                      <div className="mb-6">
                        <p className="text-xs text-muted-text mb-1">Courier & Tracking</p>
                        <p className="text-ivory font-mono text-sm">{order.courier || 'Standard'}</p>
-                       <p className="text-bright-gold font-mono text-sm mt-1">{order.trackingNumber}</p>
+                       <p className="text-bright-gold font-mono text-sm mt-1">{order.tracking_number}</p>
                      </div>
                   )}
                   
                   <div>
                     <p className="text-xs text-muted-text mb-2">Destination</p>
                     <div className="text-ivory/80 text-sm leading-loose">
-                      <p className="font-medium text-ivory">{order?.shippingAddress?.fullName}</p>
-                      <p>{order?.shippingAddress?.streetAddress}</p>
-                      <p>{order?.shippingAddress?.city}, {order?.shippingAddress?.state}</p>
-                      <p>{order?.shippingAddress?.country}</p>
+                      <p className="font-medium text-ivory">{order?.shipping_fullname}</p>
+                      <p>{order?.shipping_street}</p>
+                      <p>{order?.shipping_city}, {order?.shipping_state}</p>
+                      <p>{order?.shipping_country}</p>
                     </div>
                   </div>
                 </div>
