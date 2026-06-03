@@ -10,8 +10,7 @@ import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { initDb, seedDb, dbQuery, dbGet, dbRun } from './src/lib/database.js';
-
+import { initDb, seedDb, dbQuery, dbGet, dbRun, db } from './src/lib/database.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -538,9 +537,28 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
+
+  // Graceful shutdown
+  const shutdown = (signal: string) => {
+    console.log(`${signal} signal received: closing HTTP server`);
+    server.close(() => {
+      console.log('HTTP server closed');
+      db.close((err) => {
+        if (err) {
+          console.error('Error closing database', err);
+          process.exit(1);
+        }
+        console.log('Database connection closed');
+        process.exit(0);
+      });
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 startServer().catch(err => {
