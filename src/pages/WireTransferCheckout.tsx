@@ -20,10 +20,10 @@ const WireTransferCheckout = () => {
   // Fallback to provided details since import.meta.env might not be populated by the user
   const env = (import.meta as any).env;
   const bankDetails = {
-    bank: env.VITE_WIRE_BANK_NAME || "Swiss Bank Corporation",
-    routing: env.VITE_WIRE_ROUTING_NUMBER || "000000000",
-    account: env.VITE_WIRE_ACCOUNT_NUMBER || "0000000000",
-    name: env.VITE_WIRE_ACCOUNT_NAME || "Vellandi Diamonds LLC",
+    bank: env.VITE_WIRE_BANK_NAME || "Discover Bank",
+    routing: env.VITE_WIRE_ROUTING_NUMBER || "031100649",
+    account: env.VITE_WIRE_ACCOUNT_NUMBER || "7065995885",
+    name: env.VITE_WIRE_ACCOUNT_NAME || "Montrel Outley",
   };
 
   useEffect(() => {

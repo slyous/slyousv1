@@ -360,11 +360,26 @@ async function startServer() {
     }
   });
 
-  // Update order status (admin)
-  app.put('/api/orders/:id/status', authenticate, adminOnly, async (req: any, res) => {
+  // Update order status (admin or customer for confirming payment)
+  app.put('/api/orders/:id/status', authenticate, async (req: any, res) => {
     try {
       const { status, message, trackingNumber, courier } = req.body;
       const orderId = req.params.id;
+
+      const order = await dbGet('SELECT * FROM orders WHERE id = ?', [orderId]);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const isAdmin = req.user?.email === ADMIN_EMAIL || req.user?.role === 'ADMIN';
+      const isOwner = order.user_id === req.user.id;
+
+      if (!isAdmin) {
+        if (!isOwner) {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (status !== 'PENDING_CONFIRMATION') {
+          return res.status(403).json({ error: 'Customers can only confirm payment' });
+        }
+      }
 
       let updateSql = 'UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP';
       const params: any[] = [status];
