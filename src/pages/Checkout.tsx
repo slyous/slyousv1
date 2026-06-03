@@ -156,7 +156,7 @@ const Checkout = () => {
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+234 ..." 
+                    placeholder="+ 1 ..." 
                     className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
                   />
                 </div>
@@ -173,7 +173,7 @@ const Checkout = () => {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Abba Abdulsalam" 
+                    placeholder="John Doe" 
                     className="w-full bg-graphite/30 border border-white/10 rounded-sharp py-3 px-4 text-white focus:outline-none focus:border-bright-gold" 
                   />
                 </div>
