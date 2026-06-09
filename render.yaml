@@ -17,6 +17,8 @@ services:
         sync: false
       - key: VITE_ADMIN_EMAIL
         sync: false
+      - key: DATABASE_PATH
+        value: /opt/render/project/src/data/app.db
     disk:
       name: data
       mountPath: /opt/render/project/src/data
