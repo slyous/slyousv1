@@ -10,7 +10,7 @@ const AboutUs = () => {
           <img 
             src="/prop.jpg" 
             alt="Diamond store prop" 
-            className="w-full h-full object-cover brightness-[0.3] grayscale-[0.5] object-center"
+            className="w-full h-full object-cover brightness-[0.3] grayscale-[0.5] object-[center_15%]"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-void/20 via-transparent to-void"></div>
         </div>
