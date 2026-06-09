@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
 import Button from '@/src/components/ui/Button';
 
 const Contact = () => {
@@ -37,7 +37,16 @@ const Contact = () => {
                 </div>
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-muted mb-1">Phone</p>
-                  <p className="text-ivory">+1 (800) 123-4567</p>
+                  <p className="text-ivory">+1 548 705 7044</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5 h-5 text-bright-gold" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-muted mb-1">WhatsApp</p>
+                  <p className="text-ivory">+1 548 705 7044</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
